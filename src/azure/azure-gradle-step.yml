@@ -11,7 +11,7 @@ steps:
         export JAVA_HOME="${JAVA_HOME_11_X64}"
       fi
       ./gradlew --version
-      ./gradlew --scan --warning-mode=all -Dplatform.tooling.support.tests.enabled=true build
+      ./gradlew --parallel --scan --warning-mode=all -Dplatform.tooling.support.tests.enabled=true build
     env:
       LC_ALL: en_US.UTF-8
     displayName: Test
