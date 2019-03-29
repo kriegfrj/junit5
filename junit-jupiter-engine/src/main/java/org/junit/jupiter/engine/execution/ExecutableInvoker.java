@@ -99,8 +99,7 @@ public class ExecutableInvoker {
 	 * {@code ParameterResolvers} from
 	 */
 	public Object invoke(Method method, ExtensionContext extensionContext, ExtensionRegistry extensionRegistry) {
-		return ReflectionUtils.invokeMethod(method, null,
-			resolveParameters(method, Optional.empty(), extensionContext, extensionRegistry));
+		return invoke(method, null, extensionContext, extensionRegistry);
 	}
 
 	/**
@@ -116,20 +115,10 @@ public class ExecutableInvoker {
 	 */
 	public Object invoke(Method method, Object target, ExtensionContext extensionContext,
 			ExtensionRegistry extensionRegistry) {
-
-		@SuppressWarnings("unchecked")
-		Optional<Object> optionalTarget = (target instanceof Optional ? (Optional<Object>) target
-				: Optional.ofNullable(target));
-		return ReflectionUtils.invokeMethod(method, target,
-			resolveParameters(method, optionalTarget, extensionContext, extensionRegistry));
+		return invoke(method, target, extensionContext, extensionRegistry, InterceptorCall.NONE);
 	}
 
-	public void invokeVoidMethod(Method method, Object target, ExtensionContext extensionContext,
-			ExtensionRegistry extensionRegistry, VoidInterceptorCall interceptorCall) {
-		invoke(method, target, extensionContext, extensionRegistry, interceptorCall.adapt());
-	}
-
-	public <T> Object invoke(Method method, Object target, ExtensionContext extensionContext,
+	public <T> T invoke(Method method, Object target, ExtensionContext extensionContext,
 			ExtensionRegistry extensionRegistry, InterceptorCall<T> interceptorCall) {
 
 		@SuppressWarnings("unchecked")
@@ -138,11 +127,13 @@ public class ExecutableInvoker {
 		Object[] arguments = resolveParameters(method, optionalTarget, extensionContext, extensionRegistry);
 		ReflectiveInvocation<T> invocation = new MethodInvocation<>(method, optionalTarget, arguments);
 		try {
-			List<InvocationInterceptor> interceptors = extensionRegistry.getExtensions(InvocationInterceptor.class);
-			ListIterator<InvocationInterceptor> iterator = interceptors.listIterator(interceptors.size());
-			while (iterator.hasPrevious()) {
-				invocation = new DelegatingReflectiveInvocation<>(iterator.previous(), invocation, interceptorCall,
-					extensionContext);
+			if (interceptorCall != InterceptorCall.NONE) {
+				List<InvocationInterceptor> interceptors = extensionRegistry.getExtensions(InvocationInterceptor.class);
+				ListIterator<InvocationInterceptor> iterator = interceptors.listIterator(interceptors.size());
+				while (iterator.hasPrevious()) {
+					invocation = new DelegatingReflectiveInvocation<>(interceptorCall, iterator.previous(), invocation,
+						extensionContext);
+				}
 			}
 			return invocation.proceed();
 		}
@@ -154,8 +145,17 @@ public class ExecutableInvoker {
 	@FunctionalInterface
 	public interface InterceptorCall<T> {
 
+		InterceptorCall<Void> NONE = (interceptor, invocation, extensionContext) -> invocation.proceed();
+
 		T execute(InvocationInterceptor interceptor, ReflectiveInvocation<T> invocation,
 				ExtensionContext extensionContext) throws Throwable;
+
+		static InterceptorCall<Void> ofVoid(VoidInterceptorCall call) {
+			return ((interceptorChain, invocation, extensionContext) -> {
+				call.execute(interceptorChain, invocation, extensionContext);
+				return null;
+			});
+		}
 
 	}
 
@@ -164,13 +164,6 @@ public class ExecutableInvoker {
 
 		void execute(InvocationInterceptor interceptor, ReflectiveInvocation<Void> invocation,
 				ExtensionContext extensionContext) throws Throwable;
-
-		default InterceptorCall<Void> adapt() {
-			return ((interceptorChain, invocation, extensionContext) -> {
-				execute(interceptorChain, invocation, extensionContext);
-				return null;
-			});
-		}
 
 	}
 
@@ -216,16 +209,17 @@ public class ExecutableInvoker {
 	}
 
 	private class DelegatingReflectiveInvocation<T> implements ReflectiveInvocation<T> {
+
+		private final InterceptorCall<T> call;
 		private final InvocationInterceptor interceptor;
 		private final ReflectiveInvocation<T> invocation;
-		private final InterceptorCall<T> interceptorCall;
 		private final ExtensionContext extensionContext;
 
-		public DelegatingReflectiveInvocation(InvocationInterceptor interceptor, ReflectiveInvocation<T> invocation,
-				InterceptorCall<T> interceptorCall, ExtensionContext extensionContext) {
+		DelegatingReflectiveInvocation(InterceptorCall<T> call, InvocationInterceptor interceptor,
+				ReflectiveInvocation<T> invocation, ExtensionContext extensionContext) {
+			this.call = call;
 			this.interceptor = interceptor;
 			this.invocation = invocation;
-			this.interceptorCall = interceptorCall;
 			this.extensionContext = extensionContext;
 		}
 
@@ -251,8 +245,9 @@ public class ExecutableInvoker {
 
 		@Override
 		public T proceed() throws Throwable {
-			return interceptorCall.execute(interceptor, invocation, extensionContext);
+			return call.execute(interceptor, invocation, extensionContext);
 		}
+
 	}
 
 	/**

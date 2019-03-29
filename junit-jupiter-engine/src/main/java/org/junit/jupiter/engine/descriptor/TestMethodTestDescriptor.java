@@ -35,6 +35,7 @@ import org.junit.jupiter.engine.config.JupiterConfiguration;
 import org.junit.jupiter.engine.execution.AfterEachMethodAdapter;
 import org.junit.jupiter.engine.execution.BeforeEachMethodAdapter;
 import org.junit.jupiter.engine.execution.ExecutableInvoker;
+import org.junit.jupiter.engine.execution.ExecutableInvoker.InterceptorCall;
 import org.junit.jupiter.engine.execution.JupiterEngineExecutionContext;
 import org.junit.jupiter.engine.extension.ExtensionRegistry;
 import org.junit.platform.commons.logging.Logger;
@@ -183,8 +184,8 @@ public class TestMethodTestDescriptor extends MethodBasedTestDescriptor {
 			try {
 				Method testMethod = getTestMethod();
 				Object instance = extensionContext.getRequiredTestInstance();
-				executableInvoker.invokeVoidMethod(testMethod, instance, extensionContext,
-					context.getExtensionRegistry(), InvocationInterceptor::executeTestMethod);
+				executableInvoker.invoke(testMethod, instance, extensionContext, context.getExtensionRegistry(),
+					InterceptorCall.ofVoid(InvocationInterceptor::executeTestMethod));
 			}
 			catch (Throwable throwable) {
 				BlacklistedExceptions.rethrowIfBlacklisted(throwable);
