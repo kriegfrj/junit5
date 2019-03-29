@@ -11,6 +11,7 @@
 package org.junit.jupiter.engine.extension;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.DynamicTest.dynamicTest;
 
 import java.util.EnumSet;
 import java.util.stream.Stream;
@@ -19,7 +20,9 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestFactory;
 import org.junit.jupiter.api.TestReporter;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -27,6 +30,7 @@ import org.junit.jupiter.api.extension.InvocationInterceptor;
 import org.junit.jupiter.engine.AbstractJupiterTestEngineTests;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.platform.engine.reporting.ReportEntry;
 import org.junit.platform.testkit.engine.EngineExecutionResults;
 
@@ -34,10 +38,10 @@ class InvocationInterceptorTests extends AbstractJupiterTestEngineTests {
 
 	@ParameterizedTest
 	@EnumSource(InvocationType.class)
-	void callsInterceptorsForBeforeEachMethod(InvocationType invocationType) {
-		var results = executeTestsForClass(TestCaseWithThreeInterceptors.class);
+	void callsInterceptors(InvocationType invocationType) {
+		var results = executeTestsForClass(TestMethodWithThreeInterceptors.class);
 
-		assertThat(getEvents(results, EnumSet.of(invocationType))) //
+		assertThat(getEvents(results, EnumSet.of(invocationType)).distinct()) //
 				.containsExactly("before:foo", "before:bar", "before:baz", "test", "after:baz", "after:bar",
 					"after:foo");
 	}
@@ -51,7 +55,11 @@ class InvocationInterceptorTests extends AbstractJupiterTestEngineTests {
 	}
 
 	@ExtendWith({ FooInvocationInterceptor.class, BarInvocationInterceptor.class, BazInvocationInterceptor.class })
-	static class TestCaseWithThreeInterceptors {
+	static class LifecycleMethods {
+
+	}
+
+	static class TestMethodWithThreeInterceptors extends LifecycleMethods {
 
 		@BeforeAll
 		static void beforeAll(TestReporter reporter) {
@@ -68,6 +76,19 @@ class InvocationInterceptorTests extends AbstractJupiterTestEngineTests {
 			publish(reporter, InvocationType.TEST_METHOD);
 		}
 
+		@ParameterizedTest
+		@ValueSource(ints = { 0, 1 })
+		void testTemplate(int i, TestReporter reporter) {
+			publish(reporter, InvocationType.TEST_TEMPLATE_METHOD);
+		}
+
+		@TestFactory
+		DynamicTest testFactory(TestReporter reporter) {
+			publish(reporter, InvocationType.TEST_FACTORY_METHOD);
+			return dynamicTest("dynamicTest", () -> {
+			});
+		}
+
 		@AfterEach
 		void afterEach(TestReporter reporter) {
 			publish(reporter, InvocationType.AFTER_EACH);
@@ -78,13 +99,14 @@ class InvocationInterceptorTests extends AbstractJupiterTestEngineTests {
 			publish(reporter, InvocationType.AFTER_ALL);
 		}
 
-		private static void publish(TestReporter reporter, InvocationType type) {
+		static void publish(TestReporter reporter, InvocationType type) {
 			reporter.publishEntry(type.name(), "test");
 		}
+
 	}
 
 	enum InvocationType {
-		BEFORE_ALL, BEFORE_EACH, TEST_METHOD, AFTER_EACH, AFTER_ALL
+		BEFORE_ALL, BEFORE_EACH, TEST_METHOD, TEST_TEMPLATE_METHOD, TEST_FACTORY_METHOD, AFTER_EACH, AFTER_ALL
 	}
 
 	abstract static class ReportingInvocationInterceptor implements InvocationInterceptor {
@@ -113,6 +135,18 @@ class InvocationInterceptorTests extends AbstractJupiterTestEngineTests {
 		}
 
 		@Override
+		public void executeTestTemplateMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
+				throws Throwable {
+			wrap(invocation, extensionContext, InvocationType.TEST_TEMPLATE_METHOD);
+		}
+
+		@Override
+		public <T> T executeTestFactoryMethod(ReflectiveInvocation<T> invocation, ExtensionContext extensionContext)
+				throws Throwable {
+			return wrap(invocation, extensionContext, InvocationType.TEST_FACTORY_METHOD);
+		}
+
+		@Override
 		public void executeAfterEachMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
 				throws Throwable {
 			wrap(invocation, extensionContext, InvocationType.AFTER_EACH);
@@ -124,11 +158,11 @@ class InvocationInterceptorTests extends AbstractJupiterTestEngineTests {
 			wrap(invocation, extensionContext, InvocationType.AFTER_ALL);
 		}
 
-		private void wrap(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext, InvocationType type)
+		private <T> T wrap(ReflectiveInvocation<T> invocation, ExtensionContext extensionContext, InvocationType type)
 				throws Throwable {
 			extensionContext.publishReportEntry(type.name(), "before:" + name);
 			try {
-				invocation.proceed();
+				return invocation.proceed();
 			}
 			finally {
 				extensionContext.publishReportEntry(type.name(), "after:" + name);

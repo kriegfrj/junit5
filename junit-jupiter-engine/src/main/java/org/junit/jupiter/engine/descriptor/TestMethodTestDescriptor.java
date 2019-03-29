@@ -73,15 +73,21 @@ public class TestMethodTestDescriptor extends MethodBasedTestDescriptor {
 	public static final String SEGMENT_TYPE = "method";
 	private static final ExecutableInvoker executableInvoker = new ExecutableInvoker();
 	private static final Logger logger = LoggerFactory.getLogger(TestMethodTestDescriptor.class);
+	private static final InterceptorCall<Void> DEFAULT_INTERCEPTOR_CALL = InterceptorCall.ofVoid(
+		InvocationInterceptor::executeTestMethod);
+
+	private final InterceptorCall<?> interceptorCall;
 
 	public TestMethodTestDescriptor(UniqueId uniqueId, Class<?> testClass, Method testMethod,
 			JupiterConfiguration configuration) {
 		super(uniqueId, testClass, testMethod, configuration);
+		this.interceptorCall = DEFAULT_INTERCEPTOR_CALL;
 	}
 
 	TestMethodTestDescriptor(UniqueId uniqueId, String displayName, Class<?> testClass, Method testMethod,
-			JupiterConfiguration configuration) {
+			JupiterConfiguration configuration, InterceptorCall<?> interceptorCall) {
 		super(uniqueId, displayName, testClass, testMethod, configuration);
+		this.interceptorCall = interceptorCall;
 	}
 
 	@Override
@@ -185,7 +191,7 @@ public class TestMethodTestDescriptor extends MethodBasedTestDescriptor {
 				Method testMethod = getTestMethod();
 				Object instance = extensionContext.getRequiredTestInstance();
 				executableInvoker.invoke(testMethod, instance, extensionContext, context.getExtensionRegistry(),
-					InterceptorCall.ofVoid(InvocationInterceptor::executeTestMethod));
+					interceptorCall);
 			}
 			catch (Throwable throwable) {
 				BlacklistedExceptions.rethrowIfBlacklisted(throwable);
