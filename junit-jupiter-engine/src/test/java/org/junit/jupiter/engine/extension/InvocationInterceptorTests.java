@@ -15,7 +15,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.EnumSet;
 import java.util.stream.Stream;
 
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestReporter;
@@ -51,6 +53,11 @@ class InvocationInterceptorTests extends AbstractJupiterTestEngineTests {
 	@ExtendWith({ FooInvocationInterceptor.class, BarInvocationInterceptor.class, BazInvocationInterceptor.class })
 	static class TestCaseWithThreeInterceptors {
 
+		@BeforeAll
+		static void beforeAll(TestReporter reporter) {
+			publish(reporter, InvocationType.BEFORE_ALL);
+		}
+
 		@BeforeEach
 		void beforeEach(TestReporter reporter) {
 			publish(reporter, InvocationType.BEFORE_EACH);
@@ -66,13 +73,18 @@ class InvocationInterceptorTests extends AbstractJupiterTestEngineTests {
 			publish(reporter, InvocationType.AFTER_EACH);
 		}
 
-		private void publish(TestReporter reporter, InvocationType type) {
+		@AfterAll
+		static void afterAll(TestReporter reporter) {
+			publish(reporter, InvocationType.AFTER_ALL);
+		}
+
+		private static void publish(TestReporter reporter, InvocationType type) {
 			reporter.publishEntry(type.name(), "test");
 		}
 	}
 
 	enum InvocationType {
-		BEFORE_EACH, TEST_METHOD, AFTER_EACH
+		BEFORE_ALL, BEFORE_EACH, TEST_METHOD, AFTER_EACH, AFTER_ALL
 	}
 
 	abstract static class ReportingInvocationInterceptor implements InvocationInterceptor {
@@ -80,6 +92,12 @@ class InvocationInterceptorTests extends AbstractJupiterTestEngineTests {
 
 		ReportingInvocationInterceptor(String name) {
 			this.name = name;
+		}
+
+		@Override
+		public void executeBeforeAllMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
+				throws Throwable {
+			wrap(invocation, extensionContext, InvocationType.BEFORE_ALL);
 		}
 
 		@Override
@@ -98,6 +116,12 @@ class InvocationInterceptorTests extends AbstractJupiterTestEngineTests {
 		public void executeAfterEachMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
 				throws Throwable {
 			wrap(invocation, extensionContext, InvocationType.AFTER_EACH);
+		}
+
+		@Override
+		public void executeAfterAllMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
+				throws Throwable {
+			wrap(invocation, extensionContext, InvocationType.AFTER_ALL);
 		}
 
 		private void wrap(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext, InvocationType type)

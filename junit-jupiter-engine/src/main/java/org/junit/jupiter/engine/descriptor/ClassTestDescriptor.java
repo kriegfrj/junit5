@@ -376,8 +376,8 @@ public class ClassTestDescriptor extends JupiterTestDescriptor {
 		Object testInstance = extensionContext.getTestInstance().orElse(null);
 
 		for (Method method : this.beforeAllMethods) {
-			throwableCollector.execute(
-				() -> executableInvoker.invoke(method, testInstance, extensionContext, registry));
+			throwableCollector.execute(() -> executableInvoker.invoke(method, testInstance, extensionContext, registry,
+				InterceptorCall.ofVoid(InvocationInterceptor::executeBeforeAllMethod)));
 			if (throwableCollector.isNotEmpty()) {
 				break;
 			}
@@ -390,8 +390,9 @@ public class ClassTestDescriptor extends JupiterTestDescriptor {
 		ThrowableCollector throwableCollector = context.getThrowableCollector();
 		Object testInstance = extensionContext.getTestInstance().orElse(null);
 
-		this.afterAllMethods.forEach(method -> throwableCollector.execute(
-			() -> executableInvoker.invoke(method, testInstance, extensionContext, registry)));
+		this.afterAllMethods.forEach(
+			method -> throwableCollector.execute(() -> executableInvoker.invoke(method, testInstance, extensionContext,
+				registry, InterceptorCall.ofVoid(InvocationInterceptor::executeAfterAllMethod))));
 	}
 
 	private void invokeAfterAllCallbacks(JupiterEngineExecutionContext context) {
