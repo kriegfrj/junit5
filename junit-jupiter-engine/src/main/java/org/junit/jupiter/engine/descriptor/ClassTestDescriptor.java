@@ -344,9 +344,11 @@ public class ClassTestDescriptor extends JupiterTestDescriptor {
 			ExtensionContext extensionContext) {
 
 		Constructor<?> constructor = ReflectionUtils.getDeclaredConstructor(this.testClass);
+		InterceptorCall<Object> interceptorCall = InvocationInterceptor::executeTestClassConstructor;
 		return outerInstance.isPresent() //
-				? executableInvoker.invoke(constructor, outerInstance.get(), extensionContext, registry) //
-				: executableInvoker.invoke(constructor, extensionContext, registry);
+				? executableInvoker.invoke(constructor, outerInstance.get(), extensionContext, registry,
+					interceptorCall) //
+				: executableInvoker.invoke(constructor, extensionContext, registry, interceptorCall);
 	}
 
 	private void invokeTestInstancePostProcessors(Object instance, ExtensionRegistry registry,

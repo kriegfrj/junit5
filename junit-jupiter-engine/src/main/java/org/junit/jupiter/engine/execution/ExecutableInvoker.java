@@ -62,11 +62,18 @@ public class ExecutableInvoker {
 	 * @param extensionRegistry the {@code ExtensionRegistry} to retrieve
 	 * {@code ParameterResolvers} from
 	 */
-	public <T> T invoke(Constructor<T> constructor, ExtensionContext extensionContext,
+	public <T> T invoke(Constructor<? extends T> constructor, ExtensionContext extensionContext,
 			ExtensionRegistry extensionRegistry) {
 
-		return ReflectionUtils.newInstance(constructor,
-			resolveParameters(constructor, Optional.empty(), extensionContext, extensionRegistry));
+		return invoke(constructor, extensionContext, extensionRegistry, InterceptorCall.none());
+	}
+
+	public <T> T invoke(Constructor<? extends T> constructor, ExtensionContext extensionContext,
+			ExtensionRegistry extensionRegistry, InterceptorCall<T> interceptorCall) {
+
+		Object[] arguments = resolveParameters(constructor, Optional.empty(), extensionContext, extensionRegistry);
+		return invoke(new ConstructorInvocation<>(constructor, arguments), extensionContext, extensionRegistry,
+			interceptorCall);
 	}
 
 	/**
@@ -83,11 +90,19 @@ public class ExecutableInvoker {
 	 * @param extensionRegistry the {@code ExtensionRegistry} to retrieve
 	 * {@code ParameterResolvers} from
 	 */
-	public <T> T invoke(Constructor<T> constructor, Object outerInstance, ExtensionContext extensionContext,
+	public <T> T invoke(Constructor<? extends T> constructor, Object outerInstance, ExtensionContext extensionContext,
 			ExtensionRegistry extensionRegistry) {
 
-		return ReflectionUtils.newInstance(constructor,
-			resolveParameters(constructor, Optional.empty(), outerInstance, extensionContext, extensionRegistry));
+		return invoke(constructor, outerInstance, extensionContext, extensionRegistry, InterceptorCall.none());
+	}
+
+	public <T> T invoke(Constructor<? extends T> constructor, Object outerInstance, ExtensionContext extensionContext,
+			ExtensionRegistry extensionRegistry, InterceptorCall<T> interceptorCall) {
+
+		Object[] arguments = resolveParameters(constructor, Optional.empty(), outerInstance, extensionContext,
+			extensionRegistry);
+		return invoke(new ConstructorInvocation<>(constructor, arguments), extensionContext, extensionRegistry,
+			interceptorCall);
 	}
 
 	/**
@@ -115,7 +130,7 @@ public class ExecutableInvoker {
 	 */
 	public Object invoke(Method method, Object target, ExtensionContext extensionContext,
 			ExtensionRegistry extensionRegistry) {
-		return invoke(method, target, extensionContext, extensionRegistry, InterceptorCall.NONE);
+		return invoke(method, target, extensionContext, extensionRegistry, InterceptorCall.none());
 	}
 
 	public <T> T invoke(Method method, Object target, ExtensionContext extensionContext,
@@ -126,6 +141,11 @@ public class ExecutableInvoker {
 				: Optional.ofNullable(target));
 		Object[] arguments = resolveParameters(method, optionalTarget, extensionContext, extensionRegistry);
 		ReflectiveInvocation<T> invocation = new MethodInvocation<>(method, optionalTarget, arguments);
+		return invoke(invocation, extensionContext, extensionRegistry, interceptorCall);
+	}
+
+	private <T> T invoke(ReflectiveInvocation<T> invocation, ExtensionContext extensionContext,
+			ExtensionRegistry extensionRegistry, InterceptorCall<T> interceptorCall) {
 		try {
 			if (interceptorCall != InterceptorCall.NONE) {
 				List<InvocationInterceptor> interceptors = extensionRegistry.getExtensions(InvocationInterceptor.class);
@@ -157,6 +177,11 @@ public class ExecutableInvoker {
 			});
 		}
 
+		@SuppressWarnings("unchecked")
+		static <T> InterceptorCall<T> none() {
+			return (InterceptorCall<T>) NONE;
+		}
+
 	}
 
 	@FunctionalInterface
@@ -165,6 +190,42 @@ public class ExecutableInvoker {
 		void execute(InvocationInterceptor interceptor, ReflectiveInvocation<Void> invocation,
 				ExtensionContext extensionContext) throws Throwable;
 
+	}
+
+	static class ConstructorInvocation<T> implements ReflectiveInvocation<T> {
+
+		private final Constructor<? extends T> constructor;
+		private final Object[] arguments;
+
+		ConstructorInvocation(Constructor<? extends T> constructor, Object[] arguments) {
+			this.constructor = constructor;
+			this.arguments = arguments;
+		}
+
+		@Override
+		public Class<?> getTargetClass() {
+			return constructor.getDeclaringClass();
+		}
+
+		@Override
+		public Optional<Object> getTarget() {
+			return Optional.empty();
+		}
+
+		@Override
+		public Executable getExecutable() {
+			return constructor;
+		}
+
+		@Override
+		public List<Object> getArguments() {
+			return unmodifiableList(Arrays.asList(arguments));
+		}
+
+		@Override
+		public T proceed() {
+			return ReflectionUtils.newInstance(constructor, arguments);
+		}
 	}
 
 	static class MethodInvocation<T> implements ReflectiveInvocation<T> {

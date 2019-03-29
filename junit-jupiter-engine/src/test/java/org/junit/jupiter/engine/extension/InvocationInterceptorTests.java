@@ -55,11 +55,11 @@ class InvocationInterceptorTests extends AbstractJupiterTestEngineTests {
 	}
 
 	@ExtendWith({ FooInvocationInterceptor.class, BarInvocationInterceptor.class, BazInvocationInterceptor.class })
-	static class LifecycleMethods {
+	static class TestMethodWithThreeInterceptors {
 
-	}
-
-	static class TestMethodWithThreeInterceptors extends LifecycleMethods {
+		public TestMethodWithThreeInterceptors(TestReporter reporter) {
+			publish(reporter, InvocationType.CONSTRUCTOR);
+		}
 
 		@BeforeAll
 		static void beforeAll(TestReporter reporter) {
@@ -106,7 +106,14 @@ class InvocationInterceptorTests extends AbstractJupiterTestEngineTests {
 	}
 
 	enum InvocationType {
-		BEFORE_ALL, BEFORE_EACH, TEST_METHOD, TEST_TEMPLATE_METHOD, TEST_FACTORY_METHOD, AFTER_EACH, AFTER_ALL
+		BEFORE_ALL,
+		CONSTRUCTOR,
+		BEFORE_EACH,
+		TEST_METHOD,
+		TEST_TEMPLATE_METHOD,
+		TEST_FACTORY_METHOD,
+		AFTER_EACH,
+		AFTER_ALL
 	}
 
 	abstract static class ReportingInvocationInterceptor implements InvocationInterceptor {
@@ -120,6 +127,12 @@ class InvocationInterceptorTests extends AbstractJupiterTestEngineTests {
 		public void executeBeforeAllMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
 				throws Throwable {
 			wrap(invocation, extensionContext, InvocationType.BEFORE_ALL);
+		}
+
+		@Override
+		public <T> T executeTestClassConstructor(ReflectiveInvocation<T> invocation, ExtensionContext extensionContext)
+				throws Throwable {
+			return wrap(invocation, extensionContext, InvocationType.CONSTRUCTOR);
 		}
 
 		@Override
