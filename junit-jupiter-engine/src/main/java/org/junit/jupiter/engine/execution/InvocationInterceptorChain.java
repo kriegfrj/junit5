@@ -10,11 +10,14 @@
 
 package org.junit.jupiter.engine.execution;
 
+import static org.apiguardian.api.API.Status.INTERNAL;
+
 import java.lang.reflect.Executable;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Optional;
 
+import org.apiguardian.api.API;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.InvocationInterceptor;
 import org.junit.jupiter.api.extension.InvocationInterceptor.Invocation;
@@ -22,17 +25,17 @@ import org.junit.jupiter.api.extension.InvocationInterceptor.ReflectiveInvocatio
 import org.junit.jupiter.engine.extension.ExtensionRegistry;
 import org.junit.platform.commons.util.ExceptionUtils;
 
+@API(status = INTERNAL, since = "5.5")
 public class InvocationInterceptorChain {
 
-	public <T> T invoke(Invocation<T> originalInvocation, ExtensionContext extensionContext,
+	public <T> T invoke(Invocation<T> invocation, ExtensionContext extensionContext,
 			ExtensionRegistry extensionRegistry, InterceptorCall<T, Invocation<T>> call) {
-		return invoke(originalInvocation, extensionContext, extensionRegistry, call, InterceptedInvocation::new);
+		return invoke(invocation, extensionContext, extensionRegistry, call, InterceptedInvocation::new);
 	}
 
-	public <T> T invokeReflectively(ReflectiveInvocation<T> originalInvocation, ExtensionContext extensionContext,
+	<T> T invokeReflectively(ReflectiveInvocation<T> invocation, ExtensionContext extensionContext,
 			ExtensionRegistry extensionRegistry, InterceptorCall<T, ReflectiveInvocation<T>> call) {
-		return invoke(originalInvocation, extensionContext, extensionRegistry, call,
-			ReflectiveInterceptedInvocation::new);
+		return invoke(invocation, extensionContext, extensionRegistry, call, InterceptedReflectiveInvocation::new);
 	}
 
 	private <R, T extends Invocation<R>> R invoke(T invocation, ExtensionContext extensionContext,
@@ -42,14 +45,15 @@ public class InvocationInterceptorChain {
 
 	private <R, T extends Invocation<R>> T decorateInvocation(T invocation, ExtensionContext extensionContext,
 			ExtensionRegistry extensionRegistry, InterceptorCall<R, T> call, DecoratorFactory<R, T> decoratorFactory) {
+		if (call == InterceptorCall.NONE) {
+			return invocation;
+		}
 		T result = invocation;
-		if (call != InterceptorCall.NONE) {
-			List<InvocationInterceptor> interceptors = extensionRegistry.getExtensions(InvocationInterceptor.class);
-			ListIterator<InvocationInterceptor> iterator = interceptors.listIterator(interceptors.size());
-			while (iterator.hasPrevious()) {
-				InvocationInterceptor interceptor = iterator.previous();
-				result = decoratorFactory.decorate(result, call, interceptor, extensionContext);
-			}
+		List<InvocationInterceptor> interceptors = extensionRegistry.getExtensions(InvocationInterceptor.class);
+		ListIterator<InvocationInterceptor> iterator = interceptors.listIterator(interceptors.size());
+		while (iterator.hasPrevious()) {
+			InvocationInterceptor interceptor = iterator.previous();
+			result = decoratorFactory.decorate(result, call, interceptor, extensionContext);
 		}
 		return result;
 	}
@@ -123,11 +127,11 @@ public class InvocationInterceptorChain {
 
 	}
 
-	private static class ReflectiveInterceptedInvocation<T> extends InterceptedInvocation<T, ReflectiveInvocation<T>>
-			implements ReflectiveInvocation<T> {
+	private static class InterceptedReflectiveInvocation<R> extends InterceptedInvocation<R, ReflectiveInvocation<R>>
+			implements ReflectiveInvocation<R> {
 
-		ReflectiveInterceptedInvocation(ReflectiveInvocation<T> invocation,
-				InterceptorCall<T, ReflectiveInvocation<T>> call, InvocationInterceptor interceptor,
+		InterceptedReflectiveInvocation(ReflectiveInvocation<R> invocation,
+				InterceptorCall<R, ReflectiveInvocation<R>> call, InvocationInterceptor interceptor,
 				ExtensionContext extensionContext) {
 			super(invocation, call, interceptor, extensionContext);
 		}
