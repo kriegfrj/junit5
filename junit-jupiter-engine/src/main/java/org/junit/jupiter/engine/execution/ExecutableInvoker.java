@@ -10,6 +10,7 @@
 
 package org.junit.jupiter.engine.execution;
 
+import static java.util.Collections.unmodifiableList;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static org.apiguardian.api.API.Status.INTERNAL;
@@ -19,11 +20,15 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.util.Arrays;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Optional;
 
 import org.apiguardian.api.API;
 import org.junit.jupiter.api.extension.ExtensionContext;
+import org.junit.jupiter.api.extension.InvocationInterceptor;
+import org.junit.jupiter.api.extension.InvocationInterceptor.ReflectiveInvocation;
 import org.junit.jupiter.api.extension.ParameterContext;
 import org.junit.jupiter.api.extension.ParameterResolutionException;
 import org.junit.jupiter.api.extension.ParameterResolver;
@@ -31,6 +36,7 @@ import org.junit.jupiter.engine.extension.ExtensionRegistry;
 import org.junit.platform.commons.logging.Logger;
 import org.junit.platform.commons.logging.LoggerFactory;
 import org.junit.platform.commons.util.BlacklistedExceptions;
+import org.junit.platform.commons.util.ExceptionUtils;
 import org.junit.platform.commons.util.Preconditions;
 import org.junit.platform.commons.util.ReflectionUtils;
 import org.junit.platform.commons.util.StringUtils;
@@ -116,6 +122,137 @@ public class ExecutableInvoker {
 				: Optional.ofNullable(target));
 		return ReflectionUtils.invokeMethod(method, target,
 			resolveParameters(method, optionalTarget, extensionContext, extensionRegistry));
+	}
+
+	public void invokeVoidMethod(Method method, Object target, ExtensionContext extensionContext,
+			ExtensionRegistry extensionRegistry, VoidInterceptorCall interceptorCall) {
+		invoke(method, target, extensionContext, extensionRegistry, interceptorCall.adapt());
+	}
+
+	public <T> Object invoke(Method method, Object target, ExtensionContext extensionContext,
+			ExtensionRegistry extensionRegistry, InterceptorCall<T> interceptorCall) {
+
+		@SuppressWarnings("unchecked")
+		Optional<Object> optionalTarget = (target instanceof Optional ? (Optional<Object>) target
+				: Optional.ofNullable(target));
+		Object[] arguments = resolveParameters(method, optionalTarget, extensionContext, extensionRegistry);
+		ReflectiveInvocation<T> invocation = new MethodInvocation<>(method, optionalTarget, arguments);
+		try {
+			List<InvocationInterceptor> interceptors = extensionRegistry.getExtensions(InvocationInterceptor.class);
+			ListIterator<InvocationInterceptor> iterator = interceptors.listIterator(interceptors.size());
+			while (iterator.hasPrevious()) {
+				invocation = new DelegatingReflectiveInvocation<>(iterator.previous(), invocation, interceptorCall,
+					extensionContext);
+			}
+			return invocation.proceed();
+		}
+		catch (Throwable t) {
+			throw ExceptionUtils.throwAsUncheckedException(t);
+		}
+	}
+
+	@FunctionalInterface
+	public interface InterceptorCall<T> {
+
+		T execute(InvocationInterceptor interceptor, ReflectiveInvocation<T> invocation,
+				ExtensionContext extensionContext) throws Throwable;
+
+	}
+
+	@FunctionalInterface
+	public interface VoidInterceptorCall {
+
+		void execute(InvocationInterceptor interceptor, ReflectiveInvocation<Void> invocation,
+				ExtensionContext extensionContext) throws Throwable;
+
+		default InterceptorCall<Void> adapt() {
+			return ((interceptorChain, invocation, extensionContext) -> {
+				execute(interceptorChain, invocation, extensionContext);
+				return null;
+			});
+		}
+
+	}
+
+	static class MethodInvocation<T> implements ReflectiveInvocation<T> {
+
+		protected final Method method;
+		protected final Optional<Object> target;
+		protected final Object[] arguments;
+
+		MethodInvocation(Method method, Optional<Object> target, Object[] arguments) {
+			this.method = method;
+			this.target = target;
+			this.arguments = arguments;
+		}
+
+		@Override
+		public Class<?> getTargetClass() {
+			return target.<Class<?>> map(Object::getClass).orElseGet(method::getDeclaringClass);
+		}
+
+		@Override
+		@SuppressWarnings("unchecked")
+		public Optional<Object> getTarget() {
+			return target;
+		}
+
+		@Override
+		public Executable getExecutable() {
+			return method;
+		}
+
+		@Override
+		public List<Object> getArguments() {
+			return unmodifiableList(Arrays.asList(arguments));
+		}
+
+		@Override
+		@SuppressWarnings("unchecked")
+		public T proceed() {
+			return (T) ReflectionUtils.invokeMethod(method, target.orElse(null), arguments);
+		}
+
+	}
+
+	private class DelegatingReflectiveInvocation<T> implements ReflectiveInvocation<T> {
+		private final InvocationInterceptor interceptor;
+		private final ReflectiveInvocation<T> invocation;
+		private final InterceptorCall<T> interceptorCall;
+		private final ExtensionContext extensionContext;
+
+		public DelegatingReflectiveInvocation(InvocationInterceptor interceptor, ReflectiveInvocation<T> invocation,
+				InterceptorCall<T> interceptorCall, ExtensionContext extensionContext) {
+			this.interceptor = interceptor;
+			this.invocation = invocation;
+			this.interceptorCall = interceptorCall;
+			this.extensionContext = extensionContext;
+		}
+
+		@Override
+		public Class<?> getTargetClass() {
+			return invocation.getTargetClass();
+		}
+
+		@Override
+		public Optional<Object> getTarget() {
+			return invocation.getTarget();
+		}
+
+		@Override
+		public Executable getExecutable() {
+			return invocation.getExecutable();
+		}
+
+		@Override
+		public List<Object> getArguments() {
+			return invocation.getArguments();
+		}
+
+		@Override
+		public T proceed() throws Throwable {
+			return interceptorCall.execute(interceptor, invocation, extensionContext);
+		}
 	}
 
 	/**
@@ -263,5 +400,4 @@ public class ExecutableInvoker {
 	private static String asLabel(Executable executable) {
 		return executable instanceof Constructor ? "constructor" : "method";
 	}
-
 }
