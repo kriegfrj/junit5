@@ -28,6 +28,7 @@ import org.junit.jupiter.api.extension.BeforeTestExecutionCallback;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.InvocationInterceptor;
+import org.junit.jupiter.api.extension.InvocationInterceptor.ReflectiveInvocation;
 import org.junit.jupiter.api.extension.TestExecutionExceptionHandler;
 import org.junit.jupiter.api.extension.TestInstances;
 import org.junit.jupiter.api.extension.TestWatcher;
@@ -35,7 +36,7 @@ import org.junit.jupiter.engine.config.JupiterConfiguration;
 import org.junit.jupiter.engine.execution.AfterEachMethodAdapter;
 import org.junit.jupiter.engine.execution.BeforeEachMethodAdapter;
 import org.junit.jupiter.engine.execution.ExecutableInvoker;
-import org.junit.jupiter.engine.execution.ExecutableInvoker.InterceptorCall;
+import org.junit.jupiter.engine.execution.InvocationInterceptorChain.InterceptorCall;
 import org.junit.jupiter.engine.execution.JupiterEngineExecutionContext;
 import org.junit.jupiter.engine.extension.ExtensionRegistry;
 import org.junit.platform.commons.logging.Logger;
@@ -73,10 +74,10 @@ public class TestMethodTestDescriptor extends MethodBasedTestDescriptor {
 	public static final String SEGMENT_TYPE = "method";
 	private static final ExecutableInvoker executableInvoker = new ExecutableInvoker();
 	private static final Logger logger = LoggerFactory.getLogger(TestMethodTestDescriptor.class);
-	private static final InterceptorCall<Void> DEFAULT_INTERCEPTOR_CALL = InterceptorCall.ofVoid(
-		InvocationInterceptor::executeTestMethod);
+	private static final InterceptorCall<Void, ReflectiveInvocation<Void>> DEFAULT_INTERCEPTOR_CALL = InterceptorCall.ofVoid(
+		InvocationInterceptor::interceptTestMethod);
 
-	private final InterceptorCall<?> interceptorCall;
+	private final InterceptorCall<Void, ReflectiveInvocation<Void>> interceptorCall;
 
 	public TestMethodTestDescriptor(UniqueId uniqueId, Class<?> testClass, Method testMethod,
 			JupiterConfiguration configuration) {
@@ -85,7 +86,7 @@ public class TestMethodTestDescriptor extends MethodBasedTestDescriptor {
 	}
 
 	TestMethodTestDescriptor(UniqueId uniqueId, String displayName, Class<?> testClass, Method testMethod,
-			JupiterConfiguration configuration, InterceptorCall<?> interceptorCall) {
+			JupiterConfiguration configuration, InterceptorCall<Void, ReflectiveInvocation<Void>> interceptorCall) {
 		super(uniqueId, displayName, testClass, testMethod, configuration);
 		this.interceptorCall = interceptorCall;
 	}

@@ -16,55 +16,58 @@ import java.util.Optional;
 
 public interface InvocationInterceptor extends Extension {
 
-	default <T> T executeTestClassConstructor(ReflectiveInvocation<T> invocation, ExtensionContext extensionContext)
+	default <T> T interceptTestClassConstructor(ReflectiveInvocation<T> invocation, ExtensionContext extensionContext)
 			throws Throwable {
 		return invocation.proceed();
 	}
 
-	default void executeBeforeAllMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
+	default void interceptBeforeAllMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
 			throws Throwable {
 		invocation.proceed();
 	}
 
-	default void executeBeforeEachMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
+	default void interceptBeforeEachMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
 			throws Throwable {
 		invocation.proceed();
 	}
 
-	default void executeTestMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
+	default void interceptTestMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
 			throws Throwable {
 		invocation.proceed();
 	}
 
-	default <T> T executeTestFactoryMethod(ReflectiveInvocation<T> invocation, ExtensionContext extensionContext)
+	default <T> T interceptTestFactoryMethod(ReflectiveInvocation<T> invocation, ExtensionContext extensionContext)
 			throws Throwable {
 		return invocation.proceed();
 	}
 
-	default void executeTestTemplateMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
+	default void interceptTestTemplateMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
 			throws Throwable {
 		invocation.proceed();
 	}
 
-	default void executeDynamicTest(Invocation<Void> invocation, ExtensionContext extensionContext) throws Throwable {
+	default void interceptDynamicTest(Invocation<Void> invocation, ExtensionContext extensionContext) throws Throwable {
 		invocation.proceed();
 	}
 
-	default void executeAfterEachMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
+	default void interceptAfterEachMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
 			throws Throwable {
 		invocation.proceed();
 	}
 
-	default void executeAfterAllMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
+	default void interceptAfterAllMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
 			throws Throwable {
 		invocation.proceed();
 	}
 
 	interface Invocation<T> {
+
 		T proceed() throws Throwable;
+
 	}
 
 	interface ReflectiveInvocation<T> extends Invocation<T> {
+
 		Class<?> getTargetClass();
 
 		Optional<Object> getTarget(); // empty for static methods
@@ -72,6 +75,7 @@ public interface InvocationInterceptor extends Extension {
 		Executable getExecutable();
 
 		List<Object> getArguments();
+
 	}
 
 }

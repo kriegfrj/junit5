@@ -18,9 +18,10 @@ import java.util.Set;
 
 import org.apiguardian.api.API;
 import org.junit.jupiter.api.extension.InvocationInterceptor;
+import org.junit.jupiter.api.extension.InvocationInterceptor.ReflectiveInvocation;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 import org.junit.jupiter.engine.config.JupiterConfiguration;
-import org.junit.jupiter.engine.execution.ExecutableInvoker.InterceptorCall;
+import org.junit.jupiter.engine.execution.InvocationInterceptorChain.InterceptorCall;
 import org.junit.jupiter.engine.execution.JupiterEngineExecutionContext;
 import org.junit.jupiter.engine.extension.ExtensionRegistry;
 import org.junit.platform.engine.TestDescriptor;
@@ -37,8 +38,8 @@ import org.junit.platform.engine.support.hierarchical.ExclusiveResource;
 public class TestTemplateInvocationTestDescriptor extends TestMethodTestDescriptor {
 
 	public static final String SEGMENT_TYPE = "test-template-invocation";
-	private static final InterceptorCall<Void> INTERCEPTOR_CALL = InterceptorCall.ofVoid(
-		InvocationInterceptor::executeTestTemplateMethod);
+	private static final InterceptorCall<Void, ReflectiveInvocation<Void>> INTERCEPTOR_CALL = InterceptorCall.ofVoid(
+		InvocationInterceptor::interceptTestTemplateMethod);
 
 	private TestTemplateInvocationContext invocationContext;
 	private final int index;

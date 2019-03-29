@@ -86,6 +86,7 @@ class InvocationInterceptorTests extends AbstractJupiterTestEngineTests {
 		DynamicTest testFactory(TestReporter reporter) {
 			publish(reporter, InvocationType.TEST_FACTORY_METHOD);
 			return dynamicTest("dynamicTest", () -> {
+				publish(reporter, InvocationType.DYNAMIC_TEST);
 			});
 		}
 
@@ -112,6 +113,7 @@ class InvocationInterceptorTests extends AbstractJupiterTestEngineTests {
 		TEST_METHOD,
 		TEST_TEMPLATE_METHOD,
 		TEST_FACTORY_METHOD,
+		DYNAMIC_TEST,
 		AFTER_EACH,
 		AFTER_ALL
 	}
@@ -124,54 +126,60 @@ class InvocationInterceptorTests extends AbstractJupiterTestEngineTests {
 		}
 
 		@Override
-		public void executeBeforeAllMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
+		public void interceptBeforeAllMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
 				throws Throwable {
 			wrap(invocation, extensionContext, InvocationType.BEFORE_ALL);
 		}
 
 		@Override
-		public <T> T executeTestClassConstructor(ReflectiveInvocation<T> invocation, ExtensionContext extensionContext)
-				throws Throwable {
+		public <T> T interceptTestClassConstructor(ReflectiveInvocation<T> invocation,
+				ExtensionContext extensionContext) throws Throwable {
 			return wrap(invocation, extensionContext, InvocationType.CONSTRUCTOR);
 		}
 
 		@Override
-		public void executeBeforeEachMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
+		public void interceptBeforeEachMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
 				throws Throwable {
 			wrap(invocation, extensionContext, InvocationType.BEFORE_EACH);
 		}
 
 		@Override
-		public void executeTestMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
+		public void interceptTestMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
 				throws Throwable {
 			wrap(invocation, extensionContext, InvocationType.TEST_METHOD);
 		}
 
 		@Override
-		public void executeTestTemplateMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
-				throws Throwable {
+		public void interceptTestTemplateMethod(ReflectiveInvocation<Void> invocation,
+				ExtensionContext extensionContext) throws Throwable {
 			wrap(invocation, extensionContext, InvocationType.TEST_TEMPLATE_METHOD);
 		}
 
 		@Override
-		public <T> T executeTestFactoryMethod(ReflectiveInvocation<T> invocation, ExtensionContext extensionContext)
+		public <T> T interceptTestFactoryMethod(ReflectiveInvocation<T> invocation, ExtensionContext extensionContext)
 				throws Throwable {
 			return wrap(invocation, extensionContext, InvocationType.TEST_FACTORY_METHOD);
 		}
 
 		@Override
-		public void executeAfterEachMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
+		public void interceptDynamicTest(Invocation<Void> invocation, ExtensionContext extensionContext)
+				throws Throwable {
+			wrap(invocation, extensionContext, InvocationType.DYNAMIC_TEST);
+		}
+
+		@Override
+		public void interceptAfterEachMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
 				throws Throwable {
 			wrap(invocation, extensionContext, InvocationType.AFTER_EACH);
 		}
 
 		@Override
-		public void executeAfterAllMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
+		public void interceptAfterAllMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
 				throws Throwable {
 			wrap(invocation, extensionContext, InvocationType.AFTER_ALL);
 		}
 
-		private <T> T wrap(ReflectiveInvocation<T> invocation, ExtensionContext extensionContext, InvocationType type)
+		private <T> T wrap(Invocation<T> invocation, ExtensionContext extensionContext, InvocationType type)
 				throws Throwable {
 			extensionContext.publishReportEntry(type.name(), "before:" + name);
 			try {
