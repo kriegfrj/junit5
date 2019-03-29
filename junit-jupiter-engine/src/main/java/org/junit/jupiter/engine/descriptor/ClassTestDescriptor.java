@@ -40,6 +40,7 @@ import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionConfigurationException;
 import org.junit.jupiter.api.extension.ExtensionContext;
+import org.junit.jupiter.api.extension.InvocationInterceptor;
 import org.junit.jupiter.api.extension.TestInstanceFactory;
 import org.junit.jupiter.api.extension.TestInstancePostProcessor;
 import org.junit.jupiter.api.extension.TestInstances;
@@ -49,6 +50,8 @@ import org.junit.jupiter.engine.execution.AfterEachMethodAdapter;
 import org.junit.jupiter.engine.execution.BeforeEachMethodAdapter;
 import org.junit.jupiter.engine.execution.DefaultTestInstances;
 import org.junit.jupiter.engine.execution.ExecutableInvoker;
+import org.junit.jupiter.engine.execution.ExecutableInvoker.InterceptorCall;
+import org.junit.jupiter.engine.execution.ExecutableInvoker.VoidInterceptorCall;
 import org.junit.jupiter.engine.execution.JupiterEngineExecutionContext;
 import org.junit.jupiter.engine.execution.TestInstancesProvider;
 import org.junit.jupiter.engine.extension.ExtensionRegistry;
@@ -425,19 +428,22 @@ public class ClassTestDescriptor extends JupiterTestDescriptor {
 	}
 
 	private BeforeEachMethodAdapter synthesizeBeforeEachMethodAdapter(Method method) {
-		return (extensionContext, registry) -> invokeMethodInExtensionContext(method, extensionContext, registry);
+		return (extensionContext, registry) -> invokeMethodInExtensionContext(method, extensionContext, registry,
+			InvocationInterceptor::executeBeforeEachMethod);
 	}
 
 	private AfterEachMethodAdapter synthesizeAfterEachMethodAdapter(Method method) {
-		return (extensionContext, registry) -> invokeMethodInExtensionContext(method, extensionContext, registry);
+		return (extensionContext, registry) -> invokeMethodInExtensionContext(method, extensionContext, registry,
+			InvocationInterceptor::executeAfterEachMethod);
 	}
 
-	private void invokeMethodInExtensionContext(Method method, ExtensionContext context, ExtensionRegistry registry) {
+	private void invokeMethodInExtensionContext(Method method, ExtensionContext context, ExtensionRegistry registry,
+			VoidInterceptorCall interceptorCall) {
 		TestInstances testInstances = context.getRequiredTestInstances();
 		Object target = testInstances.findInstance(method.getDeclaringClass()).orElseThrow(
 			() -> new JUnitException("Failed to find instance for method: " + method.toGenericString()));
 
-		executableInvoker.invoke(method, target, context, registry);
+		executableInvoker.invoke(method, target, context, registry, InterceptorCall.ofVoid(interceptorCall));
 	}
 
 }
