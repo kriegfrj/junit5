@@ -28,6 +28,7 @@ import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtensionContext;
+import org.junit.jupiter.api.extension.InvocationInterceptor;
 import org.junit.jupiter.api.extension.ParameterContext;
 import org.junit.jupiter.api.extension.ParameterResolutionException;
 import org.junit.jupiter.api.extension.ParameterResolver;
@@ -61,7 +62,7 @@ class ExecutableInvokerTests {
 		Class<ConstructorInjectionTestCase> outerClass = ConstructorInjectionTestCase.class;
 		Constructor<ConstructorInjectionTestCase> constructor = ReflectionUtils.getDeclaredConstructor(outerClass);
 		ConstructorInjectionTestCase outer = newInvoker().invoke(constructor, Optional.empty(), extensionContext,
-			extensionRegistry, InterceptorCall.none());
+			extensionRegistry, passthroughInterceptor());
 
 		assertNotNull(outer);
 		assertEquals(ENIGMA, outer.str);
@@ -70,7 +71,7 @@ class ExecutableInvokerTests {
 		Constructor<ConstructorInjectionTestCase.NestedTestCase> innerConstructor = ReflectionUtils.getDeclaredConstructor(
 			innerClass);
 		ConstructorInjectionTestCase.NestedTestCase inner = newInvoker().invoke(innerConstructor, Optional.of(outer),
-			extensionContext, extensionRegistry, InterceptorCall.none());
+			extensionContext, extensionRegistry, passthroughInterceptor());
 
 		assertNotNull(inner);
 		assertEquals(42, inner.num);
@@ -82,7 +83,7 @@ class ExecutableInvokerTests {
 			ConstructorInjectionTestCase.class);
 
 		Exception exception = assertThrows(ParameterResolutionException.class, () -> newInvoker().invoke(constructor,
-			Optional.empty(), extensionContext, extensionRegistry, InterceptorCall.none()));
+			Optional.empty(), extensionContext, extensionRegistry, passthroughInterceptor()));
 
 		assertThat(exception.getMessage())//
 				.contains("No ParameterResolver registered for parameter [java.lang.String")//
@@ -91,9 +92,9 @@ class ExecutableInvokerTests {
 	}
 
 	@Test
-	void invokingMethodsWithoutParameterDoesNotDependOnExtensions() {
+	void invokingMethodsWithoutParameterDoesNotDependOnParameterResolvers() {
 		testMethodWithNoParameters();
-		extensionRegistry = null;
+		throwDuringParameterResolution(new RuntimeException("boom!"));
 
 		invokeMethod();
 
@@ -319,7 +320,11 @@ class ExecutableInvokerTests {
 
 	private void invokeMethod() {
 		newInvoker().invoke(this.method, this.instance, this.extensionContext, this.extensionRegistry,
-			InterceptorCall.none());
+			passthroughInterceptor());
+	}
+
+	static <R, T extends InvocationInterceptor.Invocation<R>> InterceptorCall<R, T> passthroughInterceptor() {
+		return (interceptor, invocation, extensionContext) -> invocation.proceed();
 	}
 
 	// -------------------------------------------------------------------------

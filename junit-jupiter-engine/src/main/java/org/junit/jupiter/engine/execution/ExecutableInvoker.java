@@ -10,7 +10,6 @@
 
 package org.junit.jupiter.engine.execution;
 
-import static java.util.Collections.unmodifiableList;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static org.apiguardian.api.API.Status.INTERNAL;
@@ -20,7 +19,6 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -37,7 +35,6 @@ import org.junit.platform.commons.logging.Logger;
 import org.junit.platform.commons.logging.LoggerFactory;
 import org.junit.platform.commons.util.BlacklistedExceptions;
 import org.junit.platform.commons.util.Preconditions;
-import org.junit.platform.commons.util.ReflectionUtils;
 import org.junit.platform.commons.util.StringUtils;
 
 /**
@@ -100,83 +97,6 @@ public class ExecutableInvoker {
 		Object[] arguments = resolveParameters(method, optionalTarget, extensionContext, extensionRegistry);
 		ReflectiveInvocation<T> invocation = new MethodInvocation<>(method, optionalTarget, arguments);
 		return interceptorChain.invokeReflectively(invocation, extensionContext, extensionRegistry, interceptorCall);
-	}
-
-	static class ConstructorInvocation<T> implements ReflectiveInvocation<T> {
-
-		private final Constructor<? extends T> constructor;
-		private final Object[] arguments;
-
-		ConstructorInvocation(Constructor<? extends T> constructor, Object[] arguments) {
-			this.constructor = constructor;
-			this.arguments = arguments;
-		}
-
-		@Override
-		public Class<?> getTargetClass() {
-			return constructor.getDeclaringClass();
-		}
-
-		@Override
-		public Optional<Object> getTarget() {
-			return Optional.empty();
-		}
-
-		@Override
-		public Executable getExecutable() {
-			return constructor;
-		}
-
-		@Override
-		public List<Object> getArguments() {
-			return unmodifiableList(Arrays.asList(arguments));
-		}
-
-		@Override
-		public T proceed() {
-			return ReflectionUtils.newInstance(constructor, arguments);
-		}
-	}
-
-	static class MethodInvocation<T> implements ReflectiveInvocation<T> {
-
-		protected final Method method;
-		protected final Optional<Object> target;
-		protected final Object[] arguments;
-
-		MethodInvocation(Method method, Optional<Object> target, Object[] arguments) {
-			this.method = method;
-			this.target = target;
-			this.arguments = arguments;
-		}
-
-		@Override
-		public Class<?> getTargetClass() {
-			return target.<Class<?>> map(Object::getClass).orElseGet(method::getDeclaringClass);
-		}
-
-		@Override
-		@SuppressWarnings("unchecked")
-		public Optional<Object> getTarget() {
-			return target;
-		}
-
-		@Override
-		public Executable getExecutable() {
-			return method;
-		}
-
-		@Override
-		public List<Object> getArguments() {
-			return unmodifiableList(Arrays.asList(arguments));
-		}
-
-		@Override
-		@SuppressWarnings("unchecked")
-		public T proceed() {
-			return (T) ReflectionUtils.invokeMethod(method, target.orElse(null), arguments);
-		}
-
 	}
 
 	/**

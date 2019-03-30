@@ -45,15 +45,14 @@ public class InvocationInterceptorChain {
 
 	private <R, T extends Invocation<R>> T decorateInvocation(T invocation, ExtensionContext extensionContext,
 			ExtensionRegistry extensionRegistry, InterceptorCall<R, T> call, DecoratorFactory<R, T> decoratorFactory) {
-		if (call == InterceptorCall.NONE) {
-			return invocation;
-		}
 		T result = invocation;
 		List<InvocationInterceptor> interceptors = extensionRegistry.getExtensions(InvocationInterceptor.class);
-		ListIterator<InvocationInterceptor> iterator = interceptors.listIterator(interceptors.size());
-		while (iterator.hasPrevious()) {
-			InvocationInterceptor interceptor = iterator.previous();
-			result = decoratorFactory.decorate(result, call, interceptor, extensionContext);
+		if (!interceptors.isEmpty()) {
+			ListIterator<InvocationInterceptor> iterator = interceptors.listIterator(interceptors.size());
+			while (iterator.hasPrevious()) {
+				InvocationInterceptor interceptor = iterator.previous();
+				result = decoratorFactory.decorate(result, call, interceptor, extensionContext);
+			}
 		}
 		return result;
 	}
@@ -78,21 +77,13 @@ public class InvocationInterceptorChain {
 	@FunctionalInterface
 	public interface InterceptorCall<R, T extends Invocation<R>> {
 
-		InterceptorCall<Object, Invocation<Object>> NONE = (interceptor, invocation,
-				extensionContext) -> invocation.proceed();
-
-		R execute(InvocationInterceptor interceptor, T invocation, ExtensionContext extensionContext) throws Throwable;
+		R apply(InvocationInterceptor interceptor, T invocation, ExtensionContext extensionContext) throws Throwable;
 
 		static <T extends Invocation<Void>> InterceptorCall<Void, T> ofVoid(VoidInterceptorCall<T> call) {
 			return ((interceptorChain, invocation, extensionContext) -> {
-				call.execute(interceptorChain, invocation, extensionContext);
+				call.apply(interceptorChain, invocation, extensionContext);
 				return null;
 			});
-		}
-
-		@SuppressWarnings("unchecked")
-		static <R, T extends Invocation<R>> InterceptorCall<R, T> none() {
-			return (InterceptorCall<R, T>) NONE;
 		}
 
 	}
@@ -100,8 +91,7 @@ public class InvocationInterceptorChain {
 	@FunctionalInterface
 	public interface VoidInterceptorCall<T extends Invocation<Void>> {
 
-		void execute(InvocationInterceptor interceptor, T invocation, ExtensionContext extensionContext)
-				throws Throwable;
+		void apply(InvocationInterceptor interceptor, T invocation, ExtensionContext extensionContext) throws Throwable;
 
 	}
 
@@ -122,7 +112,7 @@ public class InvocationInterceptorChain {
 
 		@Override
 		public R proceed() throws Throwable {
-			return call.execute(interceptor, invocation, extensionContext);
+			return call.apply(interceptor, invocation, extensionContext);
 		}
 
 	}
