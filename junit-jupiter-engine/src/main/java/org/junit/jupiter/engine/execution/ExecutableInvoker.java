@@ -25,7 +25,8 @@ import java.util.Optional;
 import org.apiguardian.api.API;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.InvocationInterceptor;
-import org.junit.jupiter.api.extension.InvocationInterceptor.ReflectiveInvocation;
+import org.junit.jupiter.api.extension.InvocationInterceptor.ConstructorContext;
+import org.junit.jupiter.api.extension.InvocationInterceptor.MethodContext;
 import org.junit.jupiter.api.extension.ParameterContext;
 import org.junit.jupiter.api.extension.ParameterResolutionException;
 import org.junit.jupiter.api.extension.ParameterResolver;
@@ -70,12 +71,12 @@ public class ExecutableInvoker {
 	 */
 	public <T> T invoke(Constructor<? extends T> constructor, Optional<Object> outerInstance,
 			ExtensionContext extensionContext, ExtensionRegistry extensionRegistry,
-			InterceptorCall<T, ReflectiveInvocation<T>> interceptorCall) {
+			InterceptorCall<ConstructorContext, T> interceptorCall) {
 
 		Object[] arguments = resolveParameters(constructor, Optional.empty(), outerInstance, extensionContext,
 			extensionRegistry);
-		ReflectiveInvocation<T> invocation = new ConstructorInvocation<>(constructor, arguments);
-		return interceptorChain.invokeReflectively(invocation, extensionContext, extensionRegistry, interceptorCall);
+		ConstructorInvocation<T> invocation = new ConstructorInvocation<>(constructor, arguments);
+		return interceptorChain.invoke(invocation, invocation, extensionContext, extensionRegistry, interceptorCall);
 	}
 
 	/**
@@ -89,14 +90,14 @@ public class ExecutableInvoker {
 	 * via all registered {@linkplain InvocationInterceptor interceptors}
 	 */
 	public <T> T invoke(Method method, Object target, ExtensionContext extensionContext,
-			ExtensionRegistry extensionRegistry, InterceptorCall<T, ReflectiveInvocation<T>> interceptorCall) {
+			ExtensionRegistry extensionRegistry, InterceptorCall<MethodContext, T> interceptorCall) {
 
 		@SuppressWarnings("unchecked")
 		Optional<Object> optionalTarget = (target instanceof Optional ? (Optional<Object>) target
 				: Optional.ofNullable(target));
 		Object[] arguments = resolveParameters(method, optionalTarget, extensionContext, extensionRegistry);
-		ReflectiveInvocation<T> invocation = new MethodInvocation<>(method, optionalTarget, arguments);
-		return interceptorChain.invokeReflectively(invocation, extensionContext, extensionRegistry, interceptorCall);
+		MethodInvocation<T> invocation = new MethodInvocation<>(method, optionalTarget, arguments);
+		return interceptorChain.invoke(invocation, invocation, extensionContext, extensionRegistry, interceptorCall);
 	}
 
 	/**

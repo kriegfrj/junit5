@@ -13,15 +13,14 @@ package org.junit.jupiter.engine.execution;
 import static java.util.Collections.unmodifiableList;
 
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Executable;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 
-import org.junit.jupiter.api.extension.InvocationInterceptor;
+import org.junit.jupiter.api.extension.InvocationInterceptor.ConstructorContext;
+import org.junit.jupiter.api.extension.InvocationInterceptor.Invocation;
 import org.junit.platform.commons.util.ReflectionUtils;
 
-class ConstructorInvocation<T> implements InvocationInterceptor.ReflectiveInvocation<T> {
+class ConstructorInvocation<T> implements Invocation<T>, ConstructorContext {
 
 	private final Constructor<? extends T> constructor;
 	private final Object[] arguments;
@@ -37,12 +36,7 @@ class ConstructorInvocation<T> implements InvocationInterceptor.ReflectiveInvoca
 	}
 
 	@Override
-	public Optional<Object> getTarget() {
-		return Optional.empty();
-	}
-
-	@Override
-	public Executable getExecutable() {
+	public Constructor<?> getConstructor() {
 		return constructor;
 	}
 

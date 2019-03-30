@@ -28,7 +28,7 @@ import org.junit.jupiter.api.extension.BeforeTestExecutionCallback;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.InvocationInterceptor;
-import org.junit.jupiter.api.extension.InvocationInterceptor.ReflectiveInvocation;
+import org.junit.jupiter.api.extension.InvocationInterceptor.MethodContext;
 import org.junit.jupiter.api.extension.TestExecutionExceptionHandler;
 import org.junit.jupiter.api.extension.TestInstances;
 import org.junit.jupiter.api.extension.TestWatcher;
@@ -74,10 +74,10 @@ public class TestMethodTestDescriptor extends MethodBasedTestDescriptor {
 	public static final String SEGMENT_TYPE = "method";
 	private static final ExecutableInvoker executableInvoker = new ExecutableInvoker();
 	private static final Logger logger = LoggerFactory.getLogger(TestMethodTestDescriptor.class);
-	private static final InterceptorCall<Void, ReflectiveInvocation<Void>> DEFAULT_INTERCEPTOR_CALL = InterceptorCall.ofVoid(
+	private static final InterceptorCall<MethodContext, Void> DEFAULT_INTERCEPTOR_CALL = InterceptorCall.ofVoid(
 		InvocationInterceptor::interceptTestMethod);
 
-	private final InterceptorCall<Void, ReflectiveInvocation<Void>> interceptorCall;
+	private final InterceptorCall<MethodContext, Void> interceptorCall;
 
 	public TestMethodTestDescriptor(UniqueId uniqueId, Class<?> testClass, Method testMethod,
 			JupiterConfiguration configuration) {
@@ -86,7 +86,7 @@ public class TestMethodTestDescriptor extends MethodBasedTestDescriptor {
 	}
 
 	TestMethodTestDescriptor(UniqueId uniqueId, String displayName, Class<?> testClass, Method testMethod,
-			JupiterConfiguration configuration, InterceptorCall<Void, ReflectiveInvocation<Void>> interceptorCall) {
+			JupiterConfiguration configuration, InterceptorCall<MethodContext, Void> interceptorCall) {
 		super(uniqueId, displayName, testClass, testMethod, configuration);
 		this.interceptorCall = interceptorCall;
 	}

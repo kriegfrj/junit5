@@ -13,6 +13,11 @@ package org.junit.jupiter.engine.extension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.DynamicTest.dynamicTest;
+import static org.junit.platform.testkit.engine.EventConditions.event;
+import static org.junit.platform.testkit.engine.EventConditions.finishedWithFailure;
+import static org.junit.platform.testkit.engine.EventConditions.test;
+import static org.junit.platform.testkit.engine.TestExecutionResultConditions.instanceOf;
+import static org.junit.platform.testkit.engine.TestExecutionResultConditions.message;
 
 import java.util.EnumSet;
 import java.util.stream.Stream;
@@ -26,16 +31,72 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
 import org.junit.jupiter.api.TestReporter;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.InvocationInterceptor;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.engine.AbstractJupiterTestEngineTests;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.platform.commons.JUnitException;
 import org.junit.platform.engine.reporting.ReportEntry;
 import org.junit.platform.testkit.engine.EngineExecutionResults;
 
 class InvocationInterceptorTests extends AbstractJupiterTestEngineTests {
+
+	@Test
+	void failsTestWhenInterceptorChainDoesNotCallInvocation() {
+		var results = executeTestsForClass(InvocationIgnoringInterceptorTestCase.class);
+
+		var tests = results.tests().assertStatistics(stats -> stats.failed(1).succeeded(0));
+		tests.failed().assertEventsMatchExactly(
+			event(test("test"), finishedWithFailure(instanceOf(JUnitException.class),
+				message(it -> it.startsWith("Chain of InvocationInterceptors never called invocation")))));
+	}
+
+	static class InvocationIgnoringInterceptorTestCase {
+		@RegisterExtension
+		Extension interceptor = new InvocationInterceptor() {
+			@Override
+			public void interceptTestMethod(Invocation<Void> invocation, MethodContext methodContext,
+					ExtensionContext extensionContext) {
+				// do nothing
+			}
+		};
+
+		@Test
+		void test() {
+			// never called
+		}
+	}
+
+	@Test
+	void failsTestWhenInterceptorChainCallsInvocationMoreThanOnce() {
+		var results = executeTestsForClass(DoubleInvocationInterceptorTestCase.class);
+
+		var tests = results.tests().assertStatistics(stats -> stats.failed(1).succeeded(0));
+		tests.failed().assertEventsMatchExactly(
+			event(test("test"), finishedWithFailure(instanceOf(JUnitException.class), message(it -> it.startsWith(
+				"Chain of InvocationInterceptors called invocation multiple times instead of just once")))));
+	}
+
+	static class DoubleInvocationInterceptorTestCase {
+		@RegisterExtension
+		Extension interceptor = new InvocationInterceptor() {
+			@Override
+			public void interceptTestMethod(Invocation<Void> invocation, MethodContext methodContext,
+					ExtensionContext extensionContext) throws Throwable {
+				invocation.proceed();
+				invocation.proceed();
+			}
+		};
+
+		@Test
+		void test() {
+			// never called
+		}
+	}
 
 	@ParameterizedTest
 	@EnumSource(InvocationType.class)
@@ -129,65 +190,64 @@ class InvocationInterceptorTests extends AbstractJupiterTestEngineTests {
 		}
 
 		@Override
-		public void interceptBeforeAllMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
-				throws Throwable {
-			assertEquals(testClass, invocation.getTargetClass());
-			assertThat(invocation.getTarget()).isEmpty();
-			assertEquals(testClass.getDeclaredMethod("beforeAll", TestReporter.class), invocation.getExecutable());
-			assertThat(invocation.getArguments()).hasSize(1).hasOnlyElementsOfType(TestReporter.class);
+		public void interceptBeforeAllMethod(Invocation<Void> invocation, MethodContext methodContext,
+				ExtensionContext extensionContext) throws Throwable {
+			assertEquals(testClass, methodContext.getTargetClass());
+			assertThat(methodContext.getTarget()).isEmpty();
+			assertEquals(testClass.getDeclaredMethod("beforeAll", TestReporter.class), methodContext.getMethod());
+			assertThat(methodContext.getArguments()).hasSize(1).hasOnlyElementsOfType(TestReporter.class);
 			reportAndProceed(invocation, extensionContext, InvocationType.BEFORE_ALL);
 		}
 
 		@Override
-		public <T> T interceptTestClassConstructor(ReflectiveInvocation<T> invocation,
+		public <T> T interceptTestClassConstructor(Invocation<T> invocation, ConstructorContext constructorContext,
 				ExtensionContext extensionContext) throws Throwable {
-			assertEquals(testClass, invocation.getTargetClass());
-			assertThat(invocation.getTarget()).isEmpty();
-			assertEquals(testClass.getDeclaredConstructor(TestReporter.class), invocation.getExecutable());
-			assertThat(invocation.getArguments()).hasSize(1).hasOnlyElementsOfType(TestReporter.class);
+			assertEquals(testClass, constructorContext.getTargetClass());
+			assertEquals(testClass.getDeclaredConstructor(TestReporter.class), constructorContext.getConstructor());
+			assertThat(constructorContext.getArguments()).hasSize(1).hasOnlyElementsOfType(TestReporter.class);
 			return reportAndProceed(invocation, extensionContext, InvocationType.CONSTRUCTOR);
 		}
 
 		@Override
-		public void interceptBeforeEachMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
-				throws Throwable {
-			assertEquals(testClass, invocation.getTargetClass());
-			assertThat(invocation.getTarget()).containsInstanceOf(testClass);
-			assertEquals(testClass.getDeclaredMethod("beforeEach", TestReporter.class), invocation.getExecutable());
-			assertThat(invocation.getArguments()).hasSize(1).hasOnlyElementsOfType(TestReporter.class);
+		public void interceptBeforeEachMethod(Invocation<Void> invocation, MethodContext methodContext,
+				ExtensionContext extensionContext) throws Throwable {
+			assertEquals(testClass, methodContext.getTargetClass());
+			assertThat(methodContext.getTarget()).containsInstanceOf(testClass);
+			assertEquals(testClass.getDeclaredMethod("beforeEach", TestReporter.class), methodContext.getMethod());
+			assertThat(methodContext.getArguments()).hasSize(1).hasOnlyElementsOfType(TestReporter.class);
 			reportAndProceed(invocation, extensionContext, InvocationType.BEFORE_EACH);
 		}
 
 		@Override
-		public void interceptTestMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
-				throws Throwable {
-			assertEquals(testClass, invocation.getTargetClass());
-			assertThat(invocation.getTarget()).containsInstanceOf(testClass);
-			assertEquals(testClass.getDeclaredMethod("test", TestReporter.class), invocation.getExecutable());
-			assertThat(invocation.getArguments()).hasSize(1).hasOnlyElementsOfType(TestReporter.class);
+		public void interceptTestMethod(Invocation<Void> invocation, MethodContext methodContext,
+				ExtensionContext extensionContext) throws Throwable {
+			assertEquals(testClass, methodContext.getTargetClass());
+			assertThat(methodContext.getTarget()).containsInstanceOf(testClass);
+			assertEquals(testClass.getDeclaredMethod("test", TestReporter.class), methodContext.getExecutable());
+			assertThat(methodContext.getArguments()).hasSize(1).hasOnlyElementsOfType(TestReporter.class);
 			reportAndProceed(invocation, extensionContext, InvocationType.TEST_METHOD);
 		}
 
 		@Override
-		public void interceptTestTemplateMethod(ReflectiveInvocation<Void> invocation,
+		public void interceptTestTemplateMethod(Invocation<Void> invocation, MethodContext methodContext,
 				ExtensionContext extensionContext) throws Throwable {
-			assertEquals(testClass, invocation.getTargetClass());
-			assertThat(invocation.getTarget()).containsInstanceOf(testClass);
+			assertEquals(testClass, methodContext.getTargetClass());
+			assertThat(methodContext.getTarget()).containsInstanceOf(testClass);
 			assertEquals(testClass.getDeclaredMethod("testTemplate", Integer.TYPE, TestReporter.class),
-				invocation.getExecutable());
-			assertThat(invocation.getArguments()).hasSize(2);
-			assertThat(invocation.getArguments().get(0)).isInstanceOf(Integer.class);
-			assertThat(invocation.getArguments().get(1)).isInstanceOf(TestReporter.class);
+				methodContext.getMethod());
+			assertThat(methodContext.getArguments()).hasSize(2);
+			assertThat(methodContext.getArguments().get(0)).isInstanceOf(Integer.class);
+			assertThat(methodContext.getArguments().get(1)).isInstanceOf(TestReporter.class);
 			reportAndProceed(invocation, extensionContext, InvocationType.TEST_TEMPLATE_METHOD);
 		}
 
 		@Override
-		public <T> T interceptTestFactoryMethod(ReflectiveInvocation<T> invocation, ExtensionContext extensionContext)
-				throws Throwable {
-			assertEquals(testClass, invocation.getTargetClass());
-			assertThat(invocation.getTarget()).containsInstanceOf(testClass);
-			assertEquals(testClass.getDeclaredMethod("testFactory", TestReporter.class), invocation.getExecutable());
-			assertThat(invocation.getArguments()).hasSize(1).hasOnlyElementsOfType(TestReporter.class);
+		public <T> T interceptTestFactoryMethod(Invocation<T> invocation, MethodContext methodContext,
+				ExtensionContext extensionContext) throws Throwable {
+			assertEquals(testClass, methodContext.getTargetClass());
+			assertThat(methodContext.getTarget()).containsInstanceOf(testClass);
+			assertEquals(testClass.getDeclaredMethod("testFactory", TestReporter.class), methodContext.getMethod());
+			assertThat(methodContext.getArguments()).hasSize(1).hasOnlyElementsOfType(TestReporter.class);
 			return reportAndProceed(invocation, extensionContext, InvocationType.TEST_FACTORY_METHOD);
 		}
 
@@ -202,22 +262,22 @@ class InvocationInterceptorTests extends AbstractJupiterTestEngineTests {
 		}
 
 		@Override
-		public void interceptAfterEachMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
-				throws Throwable {
-			assertEquals(testClass, invocation.getTargetClass());
-			assertThat(invocation.getTarget()).containsInstanceOf(testClass);
-			assertEquals(testClass.getDeclaredMethod("afterEach", TestReporter.class), invocation.getExecutable());
-			assertThat(invocation.getArguments()).hasSize(1).hasOnlyElementsOfType(TestReporter.class);
+		public void interceptAfterEachMethod(Invocation<Void> invocation, MethodContext methodContext,
+				ExtensionContext extensionContext) throws Throwable {
+			assertEquals(testClass, methodContext.getTargetClass());
+			assertThat(methodContext.getTarget()).containsInstanceOf(testClass);
+			assertEquals(testClass.getDeclaredMethod("afterEach", TestReporter.class), methodContext.getExecutable());
+			assertThat(methodContext.getArguments()).hasSize(1).hasOnlyElementsOfType(TestReporter.class);
 			reportAndProceed(invocation, extensionContext, InvocationType.AFTER_EACH);
 		}
 
 		@Override
-		public void interceptAfterAllMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
-				throws Throwable {
-			assertEquals(testClass, invocation.getTargetClass());
-			assertThat(invocation.getTarget()).isEmpty();
-			assertEquals(testClass.getDeclaredMethod("afterAll", TestReporter.class), invocation.getExecutable());
-			assertThat(invocation.getArguments()).hasSize(1).hasOnlyElementsOfType(TestReporter.class);
+		public void interceptAfterAllMethod(Invocation<Void> invocation, MethodContext methodContext,
+				ExtensionContext extensionContext) throws Throwable {
+			assertEquals(testClass, methodContext.getTargetClass());
+			assertThat(methodContext.getTarget()).isEmpty();
+			assertEquals(testClass.getDeclaredMethod("afterAll", TestReporter.class), methodContext.getExecutable());
+			assertThat(methodContext.getArguments()).hasSize(1).hasOnlyElementsOfType(TestReporter.class);
 			reportAndProceed(invocation, extensionContext, InvocationType.AFTER_ALL);
 		}
 

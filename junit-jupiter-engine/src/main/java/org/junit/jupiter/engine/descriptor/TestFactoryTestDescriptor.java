@@ -26,7 +26,7 @@ import org.junit.jupiter.api.DynamicNode;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.InvocationInterceptor;
-import org.junit.jupiter.api.extension.InvocationInterceptor.ReflectiveInvocation;
+import org.junit.jupiter.api.extension.InvocationInterceptor.MethodContext;
 import org.junit.jupiter.engine.config.JupiterConfiguration;
 import org.junit.jupiter.engine.execution.ExecutableInvoker;
 import org.junit.jupiter.engine.execution.InvocationInterceptorChain.InterceptorCall;
@@ -55,7 +55,7 @@ public class TestFactoryTestDescriptor extends TestMethodTestDescriptor implemen
 	public static final String DYNAMIC_CONTAINER_SEGMENT_TYPE = "dynamic-container";
 	public static final String DYNAMIC_TEST_SEGMENT_TYPE = "dynamic-test";
 
-	private static final InterceptorCall<Object, ReflectiveInvocation<Object>> INTERCEPTOR_CALL = InvocationInterceptor::interceptTestFactoryMethod;
+	private static final InterceptorCall<MethodContext, Object> INTERCEPTOR_CALL = InvocationInterceptor::interceptTestFactoryMethod;
 	private static final ExecutableInvoker executableInvoker = new ExecutableInvoker();
 
 	private final DynamicDescendantFilter dynamicDescendantFilter = new DynamicDescendantFilter();

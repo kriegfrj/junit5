@@ -45,7 +45,7 @@ import org.junit.jupiter.api.TestTemplate;
  *
  * @since 5.5
  * @see Invocation
- * @see ReflectiveInvocation
+ * @see ExecutableContext
  */
 @API(status = EXPERIMENTAL, since = "5.5")
 public interface InvocationInterceptor extends Extension {
@@ -60,8 +60,8 @@ public interface InvocationInterceptor extends Extension {
 	 * @return the result of the invocation; never {@code null}
 	 * @throws Throwable in case of failures
 	 */
-	default <T> T interceptTestClassConstructor(ReflectiveInvocation<T> invocation, ExtensionContext extensionContext)
-			throws Throwable {
+	default <T> T interceptTestClassConstructor(Invocation<T> invocation, ConstructorContext constructorContext,
+			ExtensionContext extensionContext) throws Throwable {
 		return invocation.proceed();
 	}
 
@@ -73,8 +73,8 @@ public interface InvocationInterceptor extends Extension {
 	 * @param extensionContext the current extension context; never {@code null}
 	 * @throws Throwable in case of failures
 	 */
-	default void interceptBeforeAllMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
-			throws Throwable {
+	default void interceptBeforeAllMethod(Invocation<Void> invocation, MethodContext methodContext,
+			ExtensionContext extensionContext) throws Throwable {
 		invocation.proceed();
 	}
 
@@ -86,8 +86,8 @@ public interface InvocationInterceptor extends Extension {
 	 * @param extensionContext the current extension context; never {@code null}
 	 * @throws Throwable in case of failures
 	 */
-	default void interceptBeforeEachMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
-			throws Throwable {
+	default void interceptBeforeEachMethod(Invocation<Void> invocation, MethodContext methodContext,
+			ExtensionContext extensionContext) throws Throwable {
 		invocation.proceed();
 	}
 
@@ -99,8 +99,8 @@ public interface InvocationInterceptor extends Extension {
 	 * @param extensionContext the current extension context; never {@code null}
 	 * @throws Throwable in case of failures
 	 */
-	default void interceptTestMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
-			throws Throwable {
+	default void interceptTestMethod(Invocation<Void> invocation, MethodContext methodContext,
+			ExtensionContext extensionContext) throws Throwable {
 		invocation.proceed();
 	}
 
@@ -114,8 +114,8 @@ public interface InvocationInterceptor extends Extension {
 	 * @return the result of the invocation; potentially {@code null}
 	 * @throws Throwable in case of failures
 	 */
-	default <T> T interceptTestFactoryMethod(ReflectiveInvocation<T> invocation, ExtensionContext extensionContext)
-			throws Throwable {
+	default <T> T interceptTestFactoryMethod(Invocation<T> invocation, MethodContext methodContext,
+			ExtensionContext extensionContext) throws Throwable {
 		return invocation.proceed();
 	}
 
@@ -127,8 +127,8 @@ public interface InvocationInterceptor extends Extension {
 	 * @param extensionContext the current extension context; never {@code null}
 	 * @throws Throwable in case of failures
 	 */
-	default void interceptTestTemplateMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
-			throws Throwable {
+	default void interceptTestTemplateMethod(Invocation<Void> invocation, MethodContext methodContext,
+			ExtensionContext extensionContext) throws Throwable {
 		invocation.proceed();
 	}
 
@@ -152,8 +152,8 @@ public interface InvocationInterceptor extends Extension {
 	 * @param extensionContext the current extension context; never {@code null}
 	 * @throws Throwable in case of failures
 	 */
-	default void interceptAfterEachMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
-			throws Throwable {
+	default void interceptAfterEachMethod(Invocation<Void> invocation, MethodContext methodContext,
+			ExtensionContext extensionContext) throws Throwable {
 		invocation.proceed();
 	}
 
@@ -165,8 +165,8 @@ public interface InvocationInterceptor extends Extension {
 	 * @param extensionContext the current extension context; never {@code null}
 	 * @throws Throwable in case of failures
 	 */
-	default void interceptAfterAllMethod(ReflectiveInvocation<Void> invocation, ExtensionContext extensionContext)
-			throws Throwable {
+	default void interceptAfterAllMethod(Invocation<Void> invocation, MethodContext methodContext,
+			ExtensionContext extensionContext) throws Throwable {
 		invocation.proceed();
 	}
 
@@ -197,11 +197,10 @@ public interface InvocationInterceptor extends Extension {
 	 *
 	 * <p>This interface is not intended to be implemented by clients.
 	 *
-	 * @param <T> the result type
 	 * @since 5.5
 	 */
 	@API(status = EXPERIMENTAL, since = "5.5")
-	interface ReflectiveInvocation<T> extends Invocation<T> {
+	interface ExecutableContext {
 
 		/**
 		 * Get the target class of this reflective invocation.
@@ -215,19 +214,6 @@ public interface InvocationInterceptor extends Extension {
 		 * @return the target class of this invocation; never {@code null}
 		 */
 		Class<?> getTargetClass();
-
-		/**
-		 * Get the target object of this reflective invocation, if available.
-		 *
-		 * <p>If this invocation represents an instance method, this method
-		 * returns the object the method will be invoked on. Otherwise, i.e. if
-		 * this invocation represents a static method or constructor, this
-		 * method returns {@link Optional#empty() empty()}.
-		 *
-		 * @return the target of this invocation; never {@code null} but
-		 * potentially empty
-		 */
-		Optional<Object> getTarget(); // empty for static methods
 
 		/**
 		 * Get the method or constructor of this reflective invocation.
@@ -248,6 +234,38 @@ public interface InvocationInterceptor extends Extension {
 		 */
 		List<Object> getArguments();
 
+	}
+
+	interface ConstructorContext extends ExecutableContext {
+		@Override
+		default Executable getExecutable() {
+			return getConstructor();
+		}
+
+		Constructor<?> getConstructor();
+	}
+
+	interface MethodContext extends ExecutableContext {
+
+		/**
+		 * Get the target object of this reflective invocation, if available.
+		 *
+		 * <p>If this invocation represents an instance method, this method
+		 * returns the object the method will be invoked on. Otherwise, i.e. if
+		 * this invocation represents a static method or constructor, this
+		 * method returns {@link Optional#empty() empty()}.
+		 *
+		 * @return the target of this invocation; never {@code null} but
+		 * potentially empty
+		 */
+		Optional<Object> getTarget();
+
+		@Override
+		default Executable getExecutable() {
+			return getMethod();
+		}
+
+		Method getMethod();
 	}
 
 }

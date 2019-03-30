@@ -30,8 +30,8 @@ import org.junit.platform.engine.UniqueId;
 class DynamicTestTestDescriptor extends DynamicNodeTestDescriptor {
 
 	private static final InvocationInterceptorChain interceptorChain = new InvocationInterceptorChain();
-	private static final InterceptorCall<Void, InvocationInterceptor.Invocation<Void>> INTERCEPTOR_CALL = InterceptorCall.ofVoid(
-		InvocationInterceptor::interceptDynamicTest);
+	private static final InterceptorCall<Void, Void> INTERCEPTOR_CALL = InterceptorCall.ofVoid((interceptor, invocation,
+			invocationContext, extensionContext) -> interceptor.interceptDynamicTest(invocation, extensionContext));
 	private final DynamicTest dynamicTest;
 
 	DynamicTestTestDescriptor(UniqueId uniqueId, int index, DynamicTest dynamicTest, TestSource source,
@@ -54,7 +54,7 @@ class DynamicTestTestDescriptor extends DynamicNodeTestDescriptor {
 		};
 		ExtensionContext extensionContext = context.getExtensionContext();
 		ExtensionRegistry extensionRegistry = context.getExtensionRegistry();
-		interceptorChain.invoke(invocation, extensionContext, extensionRegistry, INTERCEPTOR_CALL);
+		interceptorChain.invoke(invocation, null, extensionContext, extensionRegistry, INTERCEPTOR_CALL);
 		return context;
 	}
 

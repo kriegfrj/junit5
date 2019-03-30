@@ -41,7 +41,8 @@ import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionConfigurationException;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.InvocationInterceptor;
-import org.junit.jupiter.api.extension.InvocationInterceptor.ReflectiveInvocation;
+import org.junit.jupiter.api.extension.InvocationInterceptor.ConstructorContext;
+import org.junit.jupiter.api.extension.InvocationInterceptor.MethodContext;
 import org.junit.jupiter.api.extension.TestInstanceFactory;
 import org.junit.jupiter.api.extension.TestInstancePostProcessor;
 import org.junit.jupiter.api.extension.TestInstances;
@@ -85,7 +86,7 @@ public class ClassTestDescriptor extends JupiterTestDescriptor {
 
 	public static final String SEGMENT_TYPE = "class";
 	private static final ExecutableInvoker executableInvoker = new ExecutableInvoker();
-	private static final InterceptorCall<Object, ReflectiveInvocation<Object>> INTERCEPTOR_CALL = InvocationInterceptor::interceptTestClassConstructor;
+	private static final InterceptorCall<ConstructorContext, Object> INTERCEPTOR_CALL = InvocationInterceptor::interceptTestClassConstructor;
 
 	private final Class<?> testClass;
 	private final Set<TestTag> tags;
@@ -450,7 +451,7 @@ public class ClassTestDescriptor extends JupiterTestDescriptor {
 	}
 
 	private void invokeMethodInExtensionContext(Method method, ExtensionContext context, ExtensionRegistry registry,
-			VoidInterceptorCall<ReflectiveInvocation<Void>> interceptorCall) {
+			VoidInterceptorCall<MethodContext> interceptorCall) {
 		TestInstances testInstances = context.getRequiredTestInstances();
 		Object target = testInstances.findInstance(method.getDeclaringClass()).orElseThrow(
 			() -> new JUnitException("Failed to find instance for method: " + method.toGenericString()));

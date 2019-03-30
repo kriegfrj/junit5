@@ -28,7 +28,6 @@ import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtensionContext;
-import org.junit.jupiter.api.extension.InvocationInterceptor;
 import org.junit.jupiter.api.extension.ParameterContext;
 import org.junit.jupiter.api.extension.ParameterResolutionException;
 import org.junit.jupiter.api.extension.ParameterResolver;
@@ -323,8 +322,8 @@ class ExecutableInvokerTests {
 			passthroughInterceptor());
 	}
 
-	static <R, T extends InvocationInterceptor.Invocation<R>> InterceptorCall<R, T> passthroughInterceptor() {
-		return (interceptor, invocation, extensionContext) -> invocation.proceed();
+	static <C, T> InterceptorCall<C, T> passthroughInterceptor() {
+		return (interceptor, invocation, invocationContext, extensionContext) -> invocation.proceed();
 	}
 
 	// -------------------------------------------------------------------------

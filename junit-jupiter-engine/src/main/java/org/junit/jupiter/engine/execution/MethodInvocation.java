@@ -12,16 +12,16 @@ package org.junit.jupiter.engine.execution;
 
 import static java.util.Collections.unmodifiableList;
 
-import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
-import org.junit.jupiter.api.extension.InvocationInterceptor;
+import org.junit.jupiter.api.extension.InvocationInterceptor.Invocation;
+import org.junit.jupiter.api.extension.InvocationInterceptor.MethodContext;
 import org.junit.platform.commons.util.ReflectionUtils;
 
-class MethodInvocation<T> implements InvocationInterceptor.ReflectiveInvocation<T> {
+class MethodInvocation<T> implements Invocation<T>, MethodContext {
 
 	protected final Method method;
 	protected final Optional<Object> target;
@@ -45,7 +45,7 @@ class MethodInvocation<T> implements InvocationInterceptor.ReflectiveInvocation<
 	}
 
 	@Override
-	public Executable getExecutable() {
+	public Method getMethod() {
 		return method;
 	}
 

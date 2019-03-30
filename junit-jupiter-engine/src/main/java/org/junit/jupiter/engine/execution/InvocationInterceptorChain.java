@@ -10,54 +10,55 @@
 
 package org.junit.jupiter.engine.execution;
 
+import static java.util.stream.Collectors.joining;
 import static org.apiguardian.api.API.Status.INTERNAL;
 
-import java.lang.reflect.Executable;
 import java.util.List;
 import java.util.ListIterator;
-import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apiguardian.api.API;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.InvocationInterceptor;
 import org.junit.jupiter.api.extension.InvocationInterceptor.Invocation;
-import org.junit.jupiter.api.extension.InvocationInterceptor.ReflectiveInvocation;
 import org.junit.jupiter.engine.extension.ExtensionRegistry;
+import org.junit.platform.commons.JUnitException;
 import org.junit.platform.commons.util.ExceptionUtils;
 
 @API(status = INTERNAL, since = "5.5")
 public class InvocationInterceptorChain {
 
-	public <T> T invoke(Invocation<T> invocation, ExtensionContext extensionContext,
-			ExtensionRegistry extensionRegistry, InterceptorCall<T, Invocation<T>> call) {
-		return invoke(invocation, extensionContext, extensionRegistry, call, InterceptedInvocation::new);
-	}
-
-	<T> T invokeReflectively(ReflectiveInvocation<T> invocation, ExtensionContext extensionContext,
-			ExtensionRegistry extensionRegistry, InterceptorCall<T, ReflectiveInvocation<T>> call) {
-		return invoke(invocation, extensionContext, extensionRegistry, call, InterceptedReflectiveInvocation::new);
-	}
-
-	private <R, T extends Invocation<R>> R invoke(T invocation, ExtensionContext extensionContext,
-			ExtensionRegistry extensionRegistry, InterceptorCall<R, T> call, DecoratorFactory<R, T> decoratorFactory) {
-		return proceed(decorateInvocation(invocation, extensionContext, extensionRegistry, call, decoratorFactory));
-	}
-
-	private <R, T extends Invocation<R>> T decorateInvocation(T invocation, ExtensionContext extensionContext,
-			ExtensionRegistry extensionRegistry, InterceptorCall<R, T> call, DecoratorFactory<R, T> decoratorFactory) {
-		T result = invocation;
+	public <C, T> T invoke(Invocation<T> invocation, C invocationContext, ExtensionContext extensionContext,
+			ExtensionRegistry extensionRegistry, InterceptorCall<C, T> call) {
 		List<InvocationInterceptor> interceptors = extensionRegistry.getExtensions(InvocationInterceptor.class);
-		if (!interceptors.isEmpty()) {
-			ListIterator<InvocationInterceptor> iterator = interceptors.listIterator(interceptors.size());
-			while (iterator.hasPrevious()) {
-				InvocationInterceptor interceptor = iterator.previous();
-				result = decoratorFactory.decorate(result, call, interceptor, extensionContext);
-			}
+		if (interceptors.isEmpty()) {
+			return proceed(invocation);
+		}
+		return chainAndInvoke(invocation, invocationContext, extensionContext, call, interceptors);
+	}
+
+	private <C, T> T chainAndInvoke(Invocation<T> invocation, C invocationContext, ExtensionContext extensionContext,
+			InterceptorCall<C, T> call, List<InvocationInterceptor> interceptors) {
+		ValidatingInvocation<T> validatingInvocation = new ValidatingInvocation<>(invocation, interceptors);
+		Invocation<T> chainedInvocation = chainInterceptors(validatingInvocation, invocationContext, interceptors, call,
+			extensionContext);
+		T result = proceed(chainedInvocation);
+		validatingInvocation.verifyInvokedAtLeastOnce();
+		return result;
+	}
+
+	private <C, T> Invocation<T> chainInterceptors(Invocation<T> invocation, C invocationContext,
+			List<InvocationInterceptor> interceptors, InterceptorCall<C, T> call, ExtensionContext extensionContext) {
+		Invocation<T> result = new ValidatingInvocation<>(invocation, interceptors);
+		ListIterator<InvocationInterceptor> iterator = interceptors.listIterator(interceptors.size());
+		while (iterator.hasPrevious()) {
+			InvocationInterceptor interceptor = iterator.previous();
+			result = new InterceptedInvocation<>(result, invocationContext, call, interceptor, extensionContext);
 		}
 		return result;
 	}
 
-	private <R> R proceed(Invocation<R> invocation) {
+	private <T> T proceed(Invocation<T> invocation) {
 		try {
 			return invocation.proceed();
 		}
@@ -67,21 +68,14 @@ public class InvocationInterceptorChain {
 	}
 
 	@FunctionalInterface
-	private interface DecoratorFactory<R, T extends Invocation<R>> {
+	public interface InterceptorCall<C, T> {
 
-		T decorate(T invocation, InterceptorCall<R, T> call, InvocationInterceptor interceptor,
-				ExtensionContext extensionContext);
+		T apply(InvocationInterceptor interceptor, Invocation<T> invocation, C invocationContext,
+				ExtensionContext extensionContext) throws Throwable;
 
-	}
-
-	@FunctionalInterface
-	public interface InterceptorCall<R, T extends Invocation<R>> {
-
-		R apply(InvocationInterceptor interceptor, T invocation, ExtensionContext extensionContext) throws Throwable;
-
-		static <T extends Invocation<Void>> InterceptorCall<Void, T> ofVoid(VoidInterceptorCall<T> call) {
-			return ((interceptorChain, invocation, extensionContext) -> {
-				call.apply(interceptorChain, invocation, extensionContext);
+		static <C> InterceptorCall<C, Void> ofVoid(VoidInterceptorCall<C> call) {
+			return ((interceptorChain, invocation, invocationContext, extensionContext) -> {
+				call.apply(interceptorChain, invocation, invocationContext, extensionContext);
 				return null;
 			});
 		}
@@ -89,61 +83,66 @@ public class InvocationInterceptorChain {
 	}
 
 	@FunctionalInterface
-	public interface VoidInterceptorCall<T extends Invocation<Void>> {
+	public interface VoidInterceptorCall<C> {
 
-		void apply(InvocationInterceptor interceptor, T invocation, ExtensionContext extensionContext) throws Throwable;
+		void apply(InvocationInterceptor interceptor, Invocation<Void> invocation, C invocationContext,
+				ExtensionContext extensionContext) throws Throwable;
 
 	}
 
-	private static class InterceptedInvocation<R, T extends Invocation<R>> implements Invocation<R> {
+	private static class InterceptedInvocation<C, T> implements Invocation<T> {
 
-		protected final T invocation;
-		private final InterceptorCall<R, T> call;
+		private final Invocation<T> invocation;
+		private final C invocationContext;
+		private final InterceptorCall<C, T> call;
 		private final InvocationInterceptor interceptor;
 		private final ExtensionContext extensionContext;
 
-		InterceptedInvocation(T invocation, InterceptorCall<R, T> call, InvocationInterceptor interceptor,
-				ExtensionContext extensionContext) {
+		InterceptedInvocation(Invocation<T> invocation, C invocationContext, InterceptorCall<C, T> call,
+				InvocationInterceptor interceptor, ExtensionContext extensionContext) {
 			this.invocation = invocation;
+			this.invocationContext = invocationContext;
 			this.call = call;
 			this.interceptor = interceptor;
 			this.extensionContext = extensionContext;
 		}
 
 		@Override
-		public R proceed() throws Throwable {
-			return call.apply(interceptor, invocation, extensionContext);
+		public T proceed() throws Throwable {
+			return call.apply(interceptor, invocation, invocationContext, extensionContext);
 		}
 
 	}
 
-	private static class InterceptedReflectiveInvocation<R> extends InterceptedInvocation<R, ReflectiveInvocation<R>>
-			implements ReflectiveInvocation<R> {
+	private static class ValidatingInvocation<T> implements Invocation<T> {
 
-		InterceptedReflectiveInvocation(ReflectiveInvocation<R> invocation,
-				InterceptorCall<R, ReflectiveInvocation<R>> call, InvocationInterceptor interceptor,
-				ExtensionContext extensionContext) {
-			super(invocation, call, interceptor, extensionContext);
+		private final AtomicLong invocationCounter = new AtomicLong();
+		private final Invocation<T> delegate;
+		private final List<InvocationInterceptor> interceptors;
+
+		ValidatingInvocation(Invocation<T> delegate, List<InvocationInterceptor> interceptors) {
+			this.delegate = delegate;
+			this.interceptors = interceptors;
 		}
 
 		@Override
-		public Class<?> getTargetClass() {
-			return invocation.getTargetClass();
+		public T proceed() throws Throwable {
+			if (invocationCounter.incrementAndGet() > 1) {
+				fail("Chain of InvocationInterceptors called invocation multiple times instead of just once");
+			}
+			return delegate.proceed();
 		}
 
-		@Override
-		public Optional<Object> getTarget() {
-			return invocation.getTarget();
+		void verifyInvokedAtLeastOnce() {
+			if (invocationCounter.get() < 1) {
+				fail("Chain of InvocationInterceptors never called invocation");
+			}
 		}
 
-		@Override
-		public Executable getExecutable() {
-			return invocation.getExecutable();
-		}
-
-		@Override
-		public List<Object> getArguments() {
-			return invocation.getArguments();
+		private void fail(String prefix) {
+			String commaSeparatedInterceptorClasses = interceptors.stream().map(Object::getClass).map(
+				Class::getName).collect(joining(", "));
+			throw new JUnitException(prefix + ": " + commaSeparatedInterceptorClasses);
 		}
 
 	}
