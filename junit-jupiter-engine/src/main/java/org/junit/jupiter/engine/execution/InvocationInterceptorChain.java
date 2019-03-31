@@ -15,7 +15,7 @@ import static org.apiguardian.api.API.Status.INTERNAL;
 
 import java.util.List;
 import java.util.ListIterator;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apiguardian.api.API;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -49,7 +49,7 @@ public class InvocationInterceptorChain {
 
 	private <C, T> Invocation<T> chainInterceptors(Invocation<T> invocation, C invocationContext,
 			List<InvocationInterceptor> interceptors, InterceptorCall<C, T> call, ExtensionContext extensionContext) {
-		Invocation<T> result = new ValidatingInvocation<>(invocation, interceptors);
+		Invocation<T> result = invocation;
 		ListIterator<InvocationInterceptor> iterator = interceptors.listIterator(interceptors.size());
 		while (iterator.hasPrevious()) {
 			InvocationInterceptor interceptor = iterator.previous();
@@ -116,7 +116,7 @@ public class InvocationInterceptorChain {
 
 	private static class ValidatingInvocation<T> implements Invocation<T> {
 
-		private final AtomicLong invocationCounter = new AtomicLong();
+		private final AtomicBoolean invoked = new AtomicBoolean();
 		private final Invocation<T> delegate;
 		private final List<InvocationInterceptor> interceptors;
 
@@ -127,14 +127,14 @@ public class InvocationInterceptorChain {
 
 		@Override
 		public T proceed() throws Throwable {
-			if (invocationCounter.incrementAndGet() > 1) {
+			if (!invoked.compareAndSet(false, true)) {
 				fail("Chain of InvocationInterceptors called invocation multiple times instead of just once");
 			}
 			return delegate.proceed();
 		}
 
 		void verifyInvokedAtLeastOnce() {
-			if (invocationCounter.get() < 1) {
+			if (!invoked.get()) {
 				fail("Chain of InvocationInterceptors never called invocation");
 			}
 		}
