@@ -445,6 +445,21 @@ but rethrow any other type of exception.
 include::{testDir}/example/exception/IgnoreIOExceptionExtension.java[tags=user_guide]
 ----
 
+[[extensions-intercepting-invocations]]
+=== Intercepting Invocations
+
+`{InvocationInterceptor}` defines the API for `Extensions` that wish to intercept calls to
+test code.
+
+The following example shows an extension that executes all test methods in Swing's Event
+Dispatch Thread.
+
+[source,java,indent=0]
+.An extension that executes tests in a user-defined thread
+----
+include::{testDir}/example/interceptor/SwingEdtInterceptor.java[tags=user_guide]
+----
+
 [[extensions-test-templates]]
 === Providing Invocation Contexts for Test Templates
 
