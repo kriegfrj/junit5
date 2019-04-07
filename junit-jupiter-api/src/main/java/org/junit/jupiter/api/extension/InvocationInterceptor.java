@@ -45,7 +45,9 @@ import org.junit.jupiter.api.TestTemplate;
  *
  * @since 5.5
  * @see Invocation
- * @see ExecutableContext
+ * @see ConstructorContext
+ * @see MethodContext
+ * @see ExtensionContext
  */
 @API(status = EXPERIMENTAL, since = "5.5")
 public interface InvocationInterceptor extends Extension {
@@ -192,8 +194,8 @@ public interface InvocationInterceptor extends Extension {
 	}
 
 	/**
-	 * A reflective invocation of a method or constructor that returns a result
-	 * and may throw a {@link Throwable}.
+	 * The context of an executable (method or constructor) to be invoked via
+	 * reflection.
 	 *
 	 * <p>This interface is not intended to be implemented by clients.
 	 *
@@ -203,7 +205,7 @@ public interface InvocationInterceptor extends Extension {
 	interface ExecutableContext {
 
 		/**
-		 * Get the target class of this reflective invocation.
+		 * Get the target class of this context.
 		 *
 		 * <p>If this invocation represents an instance method, this method
 		 * returns the class of the object the method will be invoked on, not
@@ -216,56 +218,98 @@ public interface InvocationInterceptor extends Extension {
 		Class<?> getTargetClass();
 
 		/**
-		 * Get the method or constructor of this reflective invocation.
+		 * Get the method or constructor of this context.
 		 *
 		 * <p>If this invocation represents a method, this method returns an
 		 * instance of {@link Method}. Otherwise, i.e. if this invocation
 		 * represents a constructor, this method returns an instance of
 		 * {@link Constructor}.
 		 *
-		 * @return the executable of this invocation; never {@code null}
+		 * @return the executable of this context; never {@code null}
 		 */
 		Executable getExecutable();
 
 		/**
-		 * Get the arguments of this reflective invocation.
+		 * Get the arguments of the executable in this context.
 		 *
-		 * @return the arguments of this invocation; never {@code null}
+		 * @return the arguments of the executable in this context; never
+		 * {@code null}
 		 */
 		List<Object> getArguments();
 
 	}
 
+	/**
+	 * The context of a constructor to be invoked via reflection.
+	 *
+	 * <p>This interface is not intended to be implemented by clients.
+	 *
+	 * @since 5.5
+	 */
 	interface ConstructorContext extends ExecutableContext {
+
+		/**
+		 * Get the constructor of this context.
+		 *
+		 * @return the constructor of this context; never {@code null}
+		 */
 		@Override
-		default Executable getExecutable() {
+		default Constructor<?> getExecutable() {
 			return getConstructor();
 		}
 
+		/**
+		 * Get the constructor of this context.
+		 *
+		 * <p>This method is simply an alias for {@link #getExecutable()}.
+		 *
+		 * @return the constructor of this context; never {@code null}
+		 */
 		Constructor<?> getConstructor();
+
 	}
 
+	/**
+	 * The context of a method to be invoked via reflection.
+	 *
+	 * <p>This interface is not intended to be implemented by clients.
+	 *
+	 * @since 5.5
+	 */
 	interface MethodContext extends ExecutableContext {
+
+		/**
+		 * Get the method of this context.
+		 *
+		 * @return the method of this context; never {@code null}
+		 */
+		@Override
+		default Method getExecutable() {
+			return getMethod();
+		}
+
+		/**
+		 * Get the method of this context.
+		 *
+		 * <p>This method is simply an alias for {@link #getExecutable()}.
+		 *
+		 * @return the method of this context; never {@code null}
+		 */
+		Method getMethod();
 
 		/**
 		 * Get the target object of this reflective invocation, if available.
 		 *
 		 * <p>If this invocation represents an instance method, this method
 		 * returns the object the method will be invoked on. Otherwise, i.e. if
-		 * this invocation represents a static method or constructor, this
-		 * method returns {@link Optional#empty() empty()}.
+		 * this invocation represents a static method, this method returns
+		 * {@link Optional#empty() empty()}.
 		 *
-		 * @return the target of this invocation; never {@code null} but
-		 * potentially empty
+		 * @return the target of the method of this context; never {@code null}
+		 * but potentially empty
 		 */
 		Optional<Object> getTarget();
 
-		@Override
-		default Executable getExecutable() {
-			return getMethod();
-		}
-
-		Method getMethod();
 	}
 
 }
