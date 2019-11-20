@@ -15,6 +15,8 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singleton;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.junit.platform.engine.discovery.DiscoverySelectors.selectClass;
@@ -33,6 +35,7 @@ import static org.junit.platform.engine.discovery.DiscoverySelectors.selectUri;
 import java.io.File;
 import java.lang.reflect.Method;
 import java.net.URI;
+import java.net.URLClassLoader;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
@@ -49,6 +52,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.platform.commons.PreconditionViolationException;
+import org.junit.platform.commons.util.ClassLoaderUtils;
 import org.junit.platform.commons.util.ReflectionUtils;
 
 /**
@@ -194,6 +198,17 @@ class DiscoverySelectorsTests {
 	}
 
 	@Test
+	void selectClassByNameAndClassLoader() throws Exception {
+		try (URLClassLoader l = ClassLoaderUtils.excludingClassLoader(x -> x.equals(getClass().getTypeName()))) {
+			ClassSelector selector = selectClass(l, getClass().getName());
+			assertEquals(getClass().getTypeName(), selector.getJavaClass().getTypeName());
+			assertNotEquals(getClass(), selector.getJavaClass());
+			assertSame(l, selector.getClassLoader());
+			assertSame(l, selector.getJavaClass().getClassLoader());
+		}
+	}
+
+	@Test
 	void selectMethodByClassNameAndMethodNamePreconditions() {
 		assertViolatesPrecondition(() -> selectMethod("TestClass", null));
 		assertViolatesPrecondition(() -> selectMethod("TestClass", ""));
@@ -270,6 +285,22 @@ class DiscoverySelectorsTests {
 		Method method = clazz.getDeclaredMethod("myTest");
 		assertSelectMethodByFullyQualifiedName(clazz, method);
 	}
+	@Test
+	void selectMethodByFullyQualifiedNameAndClassLoader() throws Exception {
+		try (URLClassLoader l = ClassLoaderUtils.excludingClassLoader(x -> x.equals(getClass().getTypeName()))) {
+			Class<?> clazz = l.loadClass(getClass().getTypeName());
+			assertNotEquals(getClass(), clazz);
+			
+			Method method = clazz.getDeclaredMethod("myTest");
+			MethodSelector selector = selectMethod(l, getClass().getName(), "myTest");
+			assertEquals(method, selector.getJavaMethod());
+			assertEquals(clazz, selector.getJavaClass());
+			assertEquals(clazz.getName(), selector.getClassName());
+			assertEquals(method.getName(), selector.getMethodName());
+			assertEquals("", selector.getMethodParameterTypes());
+		}
+	}
+
 
 	@Test
 	void selectMethodByFullyQualifiedNameForDefaultMethodInInterface() throws Exception {

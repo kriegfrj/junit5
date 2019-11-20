@@ -27,20 +27,20 @@ class MethodSelectorTests extends AbstractEqualsAndHashCodeTests {
 
 	@Test
 	void equalsAndHashCode() {
-		var selector1 = new MethodSelector("TestClass", "method", "int, boolean");
-		var selector2 = new MethodSelector("TestClass", "method", "int, boolean");
+		var selector1 = new MethodSelector(null, "TestClass", "method", "int, boolean");
+		var selector2 = new MethodSelector(null, "TestClass", "method", "int, boolean");
 
-		assertEqualsAndHashCode(selector1, selector2, new MethodSelector("TestClass", "method", "int"));
-		assertEqualsAndHashCode(selector1, selector2, new MethodSelector("TestClass", "method"));
-		assertEqualsAndHashCode(selector1, selector2, new MethodSelector("TestClass", "X", "int, boolean"));
-		assertEqualsAndHashCode(selector1, selector2, new MethodSelector("TestClass", "X"));
-		assertEqualsAndHashCode(selector1, selector2, new MethodSelector("X", "method", "int, boolean"));
-		assertEqualsAndHashCode(selector1, selector2, new MethodSelector("X", "method"));
+		assertEqualsAndHashCode(selector1, selector2, new MethodSelector(null, "TestClass", "method", "int"));
+		assertEqualsAndHashCode(selector1, selector2, new MethodSelector((ClassLoader)null, "TestClass", "method"));
+		assertEqualsAndHashCode(selector1, selector2, new MethodSelector(null, "TestClass", "X", "int, boolean"));
+		assertEqualsAndHashCode(selector1, selector2, new MethodSelector((ClassLoader)null, "TestClass", "X"));
+		assertEqualsAndHashCode(selector1, selector2, new MethodSelector(null, "X", "method", "int, boolean"));
+		assertEqualsAndHashCode(selector1, selector2, new MethodSelector((ClassLoader)null, "X", "method"));
 	}
 
 	@Test
 	void preservesOriginalExceptionWhenTryingToLoadClass() {
-		MethodSelector selector = new MethodSelector("TestClass", "method", "int, boolean");
+		MethodSelector selector = new MethodSelector(null, "TestClass", "method", "int, boolean");
 
 		PreconditionViolationException e = assertThrows(PreconditionViolationException.class, selector::getJavaClass);
 

@@ -320,6 +320,21 @@ public final class DiscoverySelectors {
 	}
 
 	/**
+	 * Create a {@code ClassSelector} for the supplied class name using the
+	 * supplied class loader.
+	 *
+	 * @param classLoader the class loader to use to try and load the
+	 * supplied class. If {@code null}, the default class loader will be used.
+	 * @param className the fully qualified name of the class to select;
+	 * never {@code null} or blank
+	 * @see ClassSelector
+	 */
+	public static ClassSelector selectClass(ClassLoader classLoader, String className) {
+		Preconditions.notBlank(className, "Class name must not be null or blank");
+		return new ClassSelector(classLoader, className);
+	}
+
+	/**
 	 * Create a {@code MethodSelector} for the supplied <em>fully qualified
 	 * method name</em>.
 	 *
@@ -363,8 +378,25 @@ public final class DiscoverySelectors {
 	 * @see MethodSelector
 	 */
 	public static MethodSelector selectMethod(String fullyQualifiedMethodName) throws PreconditionViolationException {
+		return selectMethod((ClassLoader)null, fullyQualifiedMethodName);
+	}
+
+	public static MethodSelector selectMethod(ClassLoader classLoader, String fullyQualifiedMethodName) throws PreconditionViolationException { 
 		String[] methodParts = ReflectionUtils.parseFullyQualifiedMethodName(fullyQualifiedMethodName);
-		return selectMethod(methodParts[0], methodParts[1], methodParts[2]);
+		return selectMethod(classLoader, methodParts[0], methodParts[1], methodParts[2]);
+	}
+	
+	/**
+	 * Create a {@code MethodSelector} for the supplied class name and method name
+	 * using the default class loader.
+	 *
+	 * @param className the fully qualified name of the class in which the method
+	 * is declared, or a subclass thereof; never {@code null} or blank
+	 * @param methodName the name of the method to select; never {@code null} or blank
+	 * @see MethodSelector
+	 */
+	public static MethodSelector selectMethod(String className, String methodName) {
+		return selectMethod((ClassLoader)null, className, methodName);
 	}
 
 	/**
@@ -375,10 +407,10 @@ public final class DiscoverySelectors {
 	 * @param methodName the name of the method to select; never {@code null} or blank
 	 * @see MethodSelector
 	 */
-	public static MethodSelector selectMethod(String className, String methodName) {
+	public static MethodSelector selectMethod(ClassLoader classLoader, String className, String methodName) {
 		Preconditions.notBlank(className, "Class name must not be null or blank");
 		Preconditions.notBlank(methodName, "Method name must not be null or blank");
-		return new MethodSelector(className, methodName);
+		return new MethodSelector(classLoader, className, methodName);
 	}
 
 	/**
@@ -398,12 +430,16 @@ public final class DiscoverySelectors {
 	 * @see MethodSelector
 	 */
 	public static MethodSelector selectMethod(String className, String methodName, String methodParameterTypes) {
+		return selectMethod(null, className, methodName, methodParameterTypes);
+	}
+
+	public static MethodSelector selectMethod(ClassLoader classLoader, String className, String methodName, String methodParameterTypes) {
 		Preconditions.notBlank(className, "Class name must not be null or blank");
 		Preconditions.notBlank(methodName, "Method name must not be null or blank");
 		Preconditions.notNull(methodParameterTypes, "Parameter types must not be null");
-		return new MethodSelector(className, methodName, methodParameterTypes.trim());
+		return new MethodSelector(classLoader, className, methodName, methodParameterTypes.trim());
 	}
-
+	
 	/**
 	 * Create a {@code MethodSelector} for the supplied {@link Class} and method name.
 	 *

@@ -16,6 +16,8 @@ import java.util.Objects;
 
 import org.apiguardian.api.API;
 import org.junit.platform.commons.PreconditionViolationException;
+import org.junit.platform.commons.function.Try;
+import org.junit.platform.commons.util.ClassLoaderUtils;
 import org.junit.platform.commons.util.ReflectionUtils;
 import org.junit.platform.commons.util.ToStringBuilder;
 import org.junit.platform.engine.DiscoverySelector;
@@ -42,16 +44,24 @@ import org.junit.platform.engine.DiscoverySelector;
 @API(status = STABLE, since = "1.0")
 public class ClassSelector implements DiscoverySelector {
 
+	private final ClassLoader classLoader;
+	
 	private final String className;
 
 	private Class<?> javaClass;
 
 	ClassSelector(String className) {
+		this(null, className);
+	}
+
+	ClassSelector(ClassLoader classLoader, String className) {
 		this.className = className;
+		this.classLoader = classLoader;
 	}
 
 	ClassSelector(Class<?> javaClass) {
 		this.className = javaClass.getName();
+		this.classLoader = null;
 		this.javaClass = javaClass;
 	}
 
@@ -63,6 +73,13 @@ public class ClassSelector implements DiscoverySelector {
 	}
 
 	/**
+	 * Get the class loader used to load the selected class.
+	 */
+	public ClassLoader getClassLoader() {
+		return this.classLoader;
+	}
+
+	/**
 	 * Get the selected {@link Class}.
 	 *
 	 * <p>If the {@link Class} was not provided, but only the name, this method
@@ -71,7 +88,9 @@ public class ClassSelector implements DiscoverySelector {
 	 */
 	public Class<?> getJavaClass() {
 		if (this.javaClass == null) {
-			this.javaClass = ReflectionUtils.tryToLoadClass(this.className).getOrThrow(
+			final Try<Class<?>> clazz = this.classLoader == null ? ReflectionUtils.tryToLoadClass(this.className)
+					: ReflectionUtils.tryToLoadClass(className, this.classLoader);
+			this.javaClass = clazz.getOrThrow(
 				cause -> new PreconditionViolationException("Could not load class with name: " + this.className,
 					cause));
 		}

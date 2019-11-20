@@ -13,9 +13,13 @@ package org.junit.platform.engine.discovery;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.io.IOException;
+import java.net.URLClassLoader;
+
 import org.junit.jupiter.api.Test;
 import org.junit.platform.AbstractEqualsAndHashCodeTests;
 import org.junit.platform.commons.PreconditionViolationException;
+import org.junit.platform.commons.util.ClassLoaderUtils;
 
 /**
  * Unit tests for {@link ClassSelector}.
